@@ -68,10 +68,12 @@ class "CSlashCommands"
 			end
 		end
 
+		SpellBookFrame:EnableMouse(true)
+
 		-- Hide our frame
 		ModernSpellBookFrame:Hide()
 
-		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r Disabled. Using vanilla spellbook.")
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r " .. MSB_L("CmdDisabled"))
 	end;
 
 	EnableModern = function(self)
@@ -87,7 +89,7 @@ class "CSlashCommands"
 		-- Hide vanilla children
 		SpellBook:DisableVanillaSpellBook()
 
-		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r Enabled.")
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r " .. MSB_L("CmdEnabled"))
 	end;
 
 	-- ====================== TALENTS ==============================
@@ -96,9 +98,9 @@ class "CSlashCommands"
 		if (not TalentTree) then return end
 		TalentTree.enabled = not TalentTree.enabled
 		if (TalentTree.enabled) then
-			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r Custom talent tree |cff00ff00enabled|r")
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r " .. MSB_L("CmdTalentEnabled"))
 		else
-			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r Custom talent tree |cffff4444disabled|r (using vanilla)")
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r " .. MSB_L("CmdTalentDisabled"))
 			TalentTree.frame:Hide()
 		end
 	end;
@@ -109,22 +111,17 @@ class "CSlashCommands"
 		local dbVersion = ModernSpellBook_DB.dbVersion
 		local spells = ModernSpellBook_DB.spells
 		local trainerScanned = ModernSpellBook_DB.trainerScanned
+		local trainerServiceCount = ModernSpellBook_DB.trainerServiceCount
 
 		ModernSpellBook_DB = {
 			dbVersion = dbVersion,
 			spells = spells or {},
 			trainerScanned = trainerScanned,
-			showPassives = true,
-			isMinimized = false,
-			showSpellCounter = true,
-			rememberPage = true,
-			showUnlearned = true,
-			fontSize = 11.5,
-			showAllRanks = false,
-			highlights = { learnedGlow = true, learnedBadge = true, availableGlow = true, availableBadge = true },
+			trainerServiceCount = trainerServiceCount,
 		}
+		MSB_ApplyDBDefaults(ModernSpellBook_DB)
 
-		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r Settings reset to defaults. /reload to apply.")
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r " .. MSB_L("CmdReset"))
 	end;
 
 	ClearTrainerCache = function(self)
@@ -141,22 +138,22 @@ class "CSlashCommands"
 			end
 			ModernSpellBook_DB.trainerScanned = false
 			ModernSpellBook_DB.trainerServiceCount = nil
-			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r Trainer cache cleared. Visit a trainer to rescan.")
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r " .. MSB_L("CmdRescanCleared"))
 
 			if (ModernSpellBookFrame:IsVisible()) then
 				SpellBook:DrawPage()
 			end
 		else
-			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r No trainer cache to clear.")
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r " .. MSB_L("CmdRescanNone"))
 		end
 	end;
 
 	PrintHelp = function(self)
-		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook|r commands:")
-		DEFAULT_CHAT_FRAME:AddMessage("  /msb - Toggle between modern and vanilla spellbook")
-		DEFAULT_CHAT_FRAME:AddMessage("  /msb talents - Toggle between modern and vanilla talent tree")
-		DEFAULT_CHAT_FRAME:AddMessage("  /msb reset - Reset settings to defaults")
-		DEFAULT_CHAT_FRAME:AddMessage("  /msb rescan - Clear trainer cache")
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook|r " .. MSB_L("CmdHelpTitle"))
+		DEFAULT_CHAT_FRAME:AddMessage("  " .. MSB_L("CmdHelpToggle"))
+		DEFAULT_CHAT_FRAME:AddMessage("  " .. MSB_L("CmdHelpTalents"))
+		DEFAULT_CHAT_FRAME:AddMessage("  " .. MSB_L("CmdHelpReset"))
+		DEFAULT_CHAT_FRAME:AddMessage("  " .. MSB_L("CmdHelpRescan"))
 	end;
 }
 

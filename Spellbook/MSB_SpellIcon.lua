@@ -23,11 +23,11 @@ class "CSpellBookIcon"
 		self.glow_frame, self.glow_tex = MSB_CreateGlow(parent, 60, nil, 15)
 
 		-- Badge: "New" for learned spells
-		self.badge_new = MSB_CreateBadge(parent, "New", {1, 0.878, 0.078, 0.7}, {1, 0.9, 0.1, 0.8}, 12)
+		self.badge_new = MSB_CreateBadge(parent, MSB_L("BadgeNew"), {1, 0.878, 0.078, 0.7}, {1, 0.9, 0.1, 0.8}, 12)
 		self.badge_new:SetPoint("BOTTOM", parent, "TOP", 0, 2)
 
 		-- Badge: "Train" for available spells
-		self.badge_train = MSB_CreateBadge(parent, "Train", {0, 0.8, 0, 0.4}, {0.1, 0.8, 0.1, 0.8}, 7)
+		self.badge_train = MSB_CreateBadge(parent, MSB_L("BadgeTrain"), {0, 0.8, 0, 0.4}, {0.1, 0.8, 0.1, 0.8}, 7)
 		self.badge_train:SetPoint("BOTTOM", self.icon, "TOP", 0, 2)
 
 		-- Glow: stance active indicator
@@ -140,7 +140,8 @@ class "CSpellBookIcon"
 	end;
 
 	DismissAvailableHighlight = function(self, spellInfo)
-		if (self.glow_frame:IsShown()) then
+		local hadHighlight = self.glow_frame:IsShown() or self.badge_train:IsShown()
+		if (hadHighlight) then
 			self.glow_frame:Hide()
 			self.badge_train:Hide()
 			local key = MSB_SpellKey(spellInfo.spellName, spellInfo.spellRank)

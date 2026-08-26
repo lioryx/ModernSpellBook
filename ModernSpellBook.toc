@@ -4,14 +4,16 @@
 ## Notes-frFR: Modifie le livre de sorts pour un look plus moderne inspiré de la version commerciale.
 ## Notes-deDE: Ändert das Zauberbuch zu einem moderneren Aussehen, inspiriert von der Einzelhandelsversion.
 ## Notes-esES: Cambia el libro de hechizos a un aspecto más moderno inspirado en la versión comercial.
+## Notes-zhCN: 将法术书改为受现代版本启发的更现代的外观。
+## Notes-zhTW: 將法術書改為受現代版本啟發的更現代的外觀。
 ## Version: 1.5.4-TW
 ## DefaultState: enabled
 
 ## SavedVariablesPerCharacter: ModernSpellBook_DB
 
 # Lib
-Lib\MSB_Class.lua
 Lib\MSB_Compat.lua
+Lib\MSB_Class.lua
 Lib\MSB_UIFactories.lua
 Lib\MSB_TextStyle.lua
 
@@ -38,6 +40,7 @@ Talents\MSB_Talents.lua
 Talents\MSB_TalentIcon.lua
 Talents\MSB_TalentConnection.lua
 Talents\MSB_TalentGrid.lua
+Talents\MSB_TalentSimulation.lua
 Talents\MSB_TalentExpanded.lua
 Talents\MSB_TalentSettings.lua
 Talents\MSB_TalentTree.lua

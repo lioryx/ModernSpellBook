@@ -10,6 +10,33 @@ local maximumPages = 2
 local spellUpdateRequired = true
 local DB_VERSION = 4
 
+-- Fill missing DB fields with defaults. Preserves existing values.
+-- Used by OnAddonLoaded and /msb reset so both stay in sync.
+function MSB_ApplyDBDefaults(db)
+	if (not db) then return end
+	if (db.showPassives == nil) then db.showPassives = true end
+	if (db.showSpellCounter == nil) then db.showSpellCounter = true end
+	if (db.rememberPage == nil) then db.rememberPage = true end
+	if (db.showUnlearned == nil) then db.showUnlearned = true end
+	if (db.showUpcoming == nil) then db.showUpcoming = true end
+	if (db.showContinuationHeaders == nil) then db.showContinuationHeaders = true end
+	if (db.showAllRanks == nil) then db.showAllRanks = false end
+	if (db.isMinimized == nil) then db.isMinimized = false end
+	if (not db.fontSize) then db.fontSize = 11.5 end
+	if (not db.textColorMode) then db.textColorMode = "light" end
+	if (not db.highlights) then
+		db.highlights = { learnedGlow = true, learnedBadge = true, availableGlow = true, availableBadge = true }
+	end
+	if (not db.iconFrame) then
+		db.iconFrame = { spells = true, passives = true, other = true, unlearned = false }
+	end
+	if (db.iconFrame.unlearned == nil) then db.iconFrame.unlearned = false end
+	if (db.iconFrame.spells == nil) then db.iconFrame.spells = true end
+	if (db.iconFrame.passives == nil) then db.iconFrame.passives = true end
+	if (db.iconFrame.other == nil) then db.iconFrame.other = true end
+	if (not db.spells) then db.spells = {} end
+end
+
 local windowSettings = {
 	posy = 0,
 	height = 560,
@@ -67,29 +94,24 @@ class "CSpellBook"
 	OnAddonLoaded = function(self)
 		if (arg1 ~= "ModernSpellBook") then return end
 
-		-- Wipe DB if schema version mismatch
+		-- Wipe DB if schema version mismatch (preserve spell cache per AGENTS.md)
 		if (not ModernSpellBook_DB) then
 			ModernSpellBook_DB = {}
 		end
 		if (ModernSpellBook_DB.dbVersion ~= DB_VERSION) then
+			local spells = ModernSpellBook_DB.spells
+			local trainerScanned = ModernSpellBook_DB.trainerScanned
+			local trainerServiceCount = ModernSpellBook_DB.trainerServiceCount
 			for k in pairs(ModernSpellBook_DB) do
 				ModernSpellBook_DB[k] = nil
 			end
-			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r Settings reset (DB version " .. DB_VERSION .. ").")
+			ModernSpellBook_DB.spells = spells or {}
+			ModernSpellBook_DB.trainerScanned = trainerScanned
+			ModernSpellBook_DB.trainerServiceCount = trainerServiceCount
+			DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r " .. MSB_L("SettingsResetNotice", tostring(DB_VERSION)))
 		end
 
-		-- Defaults
-		if (ModernSpellBook_DB.showPassives == nil) then ModernSpellBook_DB.showPassives = true end
-		if (ModernSpellBook_DB.showSpellCounter == nil) then ModernSpellBook_DB.showSpellCounter = true end
-		if (ModernSpellBook_DB.rememberPage == nil) then ModernSpellBook_DB.rememberPage = true end
-		if (ModernSpellBook_DB.showUnlearned == nil) then ModernSpellBook_DB.showUnlearned = true end
-		if (ModernSpellBook_DB.showUpcoming == nil) then ModernSpellBook_DB.showUpcoming = true end
-		if (ModernSpellBook_DB.showContinuationHeaders == nil) then ModernSpellBook_DB.showContinuationHeaders = true end
-		if (not ModernSpellBook_DB.fontSize) then ModernSpellBook_DB.fontSize = 11.5 end
-		if (not ModernSpellBook_DB.highlights) then
-			ModernSpellBook_DB.highlights = { learnedGlow = true, learnedBadge = true, availableGlow = true, availableBadge = true }
-		end
-		if (not ModernSpellBook_DB.spells) then ModernSpellBook_DB.spells = {} end
+		MSB_ApplyDBDefaults(ModernSpellBook_DB)
 		ModernSpellBook_DB.dbVersion = DB_VERSION
 
 		self.frame.ClientLocale = Localization.current
@@ -146,9 +168,9 @@ class "CSpellBook"
 			self.frame.selectedTab = ModernSpellBook_DB.rememberPage and ModernSpellBook_DB.lastTab or 1
 			self.frame.tab1 = self:NewTab(className)
 			self.frame.tab2 = self:NewTab(GENERAL)
-			self.frame.tab3 = self:NewTab("Pet")
+			self.frame.tab3 = self:NewTab(MSB_L("PetTab"))
 
-			self.frame.customTabs = {}
+			self.frame.customTabMap = {}
 
 			self.frame.tab3:UpdateAsPetTab()
 			self:SetShape(ModernSpellBook_DB.isMinimized)
@@ -172,6 +194,22 @@ class "CSpellBook"
 		end
 
 		self:CreateCustomTabs()
+
+		-- If the remembered tab no longer exists or is hidden (custom tabs vary
+		-- per character), fall back to the class tab.
+		local selExists = false
+		for _, tab in ipairs(self.frame.Tabgroups) do
+			if (tab.tab_number == self.frame.selectedTab and tab:IsShown()) then
+				selExists = true
+				break
+			end
+		end
+		if (not selExists and self.frame.Tabgroups[1]) then
+			self.frame.selectedTab = 1
+			for _, tab in ipairs(self.frame.Tabgroups) do
+				if (tab.tab_number == 1) then tab:SetSelected() else tab:SetDeselected() end
+			end
+		end
 
 		-- Reset to page 1 / tab 1 if "Remember page" is off
 		if (not ModernSpellBook_DB.rememberPage) then
@@ -200,12 +238,6 @@ class "CSpellBook"
 
 		if (not self.frame.isFirstLoad) then return end
 		self.frame.isFirstLoad = false
-
-		if (ShowAllSpellRanksCheckbox and ShowAllSpellRanksCheckbox.HookScript) then
-			HookScript(ShowAllSpellRanksCheckbox, "OnClick", function()
-				SpellBook:DrawPage()
-			end)
-		end
 	end;
 
 	-- ========================= SETUP =============================
@@ -358,14 +390,14 @@ class "CSpellBook"
 
 		self.frame.trainerHint = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		self.frame.trainerHint:SetPoint("BOTTOM", self.frame, "BOTTOM", 0, 60)
-		self.frame.trainerHint:SetText("Visit a class trainer in a major city to fetch the FULL list of available spells.")
-		self.frame.trainerHint:SetFont("Fonts\\FRIZQT__.TTF", 10)
+		self.frame.trainerHint:SetText(MSB_L("TrainerHint"))
+		self.frame.trainerHint:SetFont(MSB_GetUIFont(), 10)
 		self.frame.trainerHint:SetTextColor(1, 1, 1)
 		self.frame.trainerHint:Hide()
 
 		self.frame.spellCounter = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		self.frame.spellCounter:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", 60, 60)
-		self.frame.spellCounter:SetFont("Fonts\\FRIZQT__.TTF", 10)
+		self.frame.spellCounter:SetFont(MSB_GetUIFont(), 10)
 		self.frame.spellCounter:SetTextColor(1, 1, 1)
 
 		-- Upcoming spells row (grows right-to-left from page TOPRIGHT, label centered above)
@@ -378,7 +410,7 @@ class "CSpellBook"
 		self.frame.upcomingFrame:SetPoint("TOPRIGHT", self.frame.backgroundLeft, "TOPRIGHT", -100, -30)
 
 		self.frame.upcomingLabel = self.frame.upcomingFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-		self.frame.upcomingLabel:SetFont("Fonts\\FRIZQT__.TTF", 10)
+		self.frame.upcomingLabel:SetFont(MSB_GetUIFont(), 10)
 		self.frame.upcomingLabel:SetTextColor(1, 1, 1)
 
 		self.frame.upcomingIcons = {}
@@ -439,7 +471,7 @@ class "CSpellBook"
 		self.frame.ShowPassiveSpellsCheckBox.text = self.frame.ShowPassiveSpellsCheckBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		self.frame.ShowPassiveSpellsCheckBox.text:SetPoint("TOPLEFT", self.frame.ShowPassiveSpellsCheckBox, "TOPLEFT", 20, -3.5)
 		self.frame.ShowPassiveSpellsCheckBox.text:SetText(self.frame.ClientLocale.ShowPassive)
-		self.frame.ShowPassiveSpellsCheckBox.text:SetFont("Fonts\\FRIZQT__.TTF", 10)
+		self.frame.ShowPassiveSpellsCheckBox.text:SetFont(MSB_GetUIFont(), 10)
 		local passiveTextWidth = 80
 		if (self.frame.ShowPassiveSpellsCheckBox.text.GetStringWidth) then
 			passiveTextWidth = self.frame.ShowPassiveSpellsCheckBox.text:GetStringWidth()
@@ -461,8 +493,8 @@ class "CSpellBook"
 
 		ShowAllSpellRanksCheckboxText = ShowAllSpellRanksCheckbox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		ShowAllSpellRanksCheckboxText:SetPoint("TOPLEFT", ShowAllSpellRanksCheckbox, "TOPLEFT", 20, -3.5)
-		ShowAllSpellRanksCheckboxText:SetText("All ranks")
-		ShowAllSpellRanksCheckboxText:SetFont("Fonts\\FRIZQT__.TTF", 10)
+		ShowAllSpellRanksCheckboxText:SetText(MSB_L("AllRanks"))
+		ShowAllSpellRanksCheckboxText:SetFont(MSB_GetUIFont(), 10)
 
 		local labelWidth = 50
 		if (ShowAllSpellRanksCheckboxText.GetStringWidth) then
@@ -480,7 +512,7 @@ class "CSpellBook"
 	AddPageButtons = function(self)
 		self.frame.pageText = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		self.frame.pageText:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -110, 60)
-		self.frame.pageText:SetText("Page 1")
+		self.frame.pageText:SetText(string.format(PRODUCT_CHOICE_PAGE_NUMBER, 1, 1))
 		self.frame.pageText:SetTextColor(1, 1, 1)
 
 		self.frame.previousPage = CreateFrame("Button", nil, self.frame)
@@ -601,7 +633,12 @@ class "CSpellBook"
 						WhatsTrainingFrame:Hide()
 						SpellBookCloseButton:ClearAllPoints()
 						SpellBookCloseButton:SetPoint("CENTER", self.frame.CloseButton, "CENTER", 0, 0)
-						SpellBookFrame:SetScript("OnShow", nil)
+						-- Restore modern OnShow hook (do not leave script as nil)
+						SpellBookFrame:SetScript("OnShow", function()
+							if (SpellBookFrame_OnShow) then
+								SpellBookFrame_OnShow()
+							end
+						end)
 					end)
 				end)
 			end
@@ -682,7 +719,7 @@ class "CSpellBook"
 
 		for _, category in ipairs(allSpellCategories) do
 			if (AllSpells[category] ~= nil and table.getn(AllSpells[category]) > 0) then
-				spells = AllSpells[category]
+				local spells = AllSpells[category]
 				if (currentPageRows +(table.getn(spells) < 3 and 3 or 4) > 7.5) then
 					currentPageRows = -2
 					drawingPageNumber = math.mod(drawingPageNumber, maxPagesPerView) +1
@@ -845,24 +882,67 @@ class "CSpellBook"
 	CreateCustomTabs = function(self)
 		if (self.frame.otherTabCreated) then return end
 
-		-- Check if any custom spell tabs exist (Companions, Mounts, Toys)
-		local customTabNames = {"Mounts", "Companions", "Toys"}
-		local numTabs = GetNumSpellTabs and GetNumSpellTabs() or 4
-		local hasAny = false
+		-- Build a lookup from any recognised form of a custom tab name to its canonical
+		-- English key. The canonical key drives MSB_L("CompanionsTab" etc.) for the label.
+		-- The ACTUAL name returned by GetSpellTabInfo is stored in customTabMap so that
+		-- GetCustomTabSpells can find the right tab even on localised clients.
+		--
+		-- IMPORTANT: aliases must never contain nil at an earlier index than a real value,
+		-- because Lua 5.0 ipairs stops at the first nil.  We build each alias table with
+		-- explicit guards so that nil entries are simply skipped.
+		local loc = Localization and Localization.current
 
-		for _, customName in ipairs(customTabNames) do
-			for i = 1, numTabs do
-				local tabName = GetSpellTabInfo(i)
-				if (tabName == customName) then
-					hasAny = true
-					break
-				end
-			end
-			if (hasAny) then break end
+		local function addAlias(t, v)
+			if (v and v ~= "") then t[table.getn(t) + 1] = v end
 		end
 
-		if (hasAny) then
-			self:NewTab("Other")
+		local companionAliases = {}
+		addAlias(companionAliases, COMPANIONS)
+		addAlias(companionAliases, loc and loc.CompanionsTab)
+
+		local mountAliases = {}
+		addAlias(mountAliases, SPELLBOOK_ABILITY_MOUNTS)
+		addAlias(mountAliases, loc and loc.MountsTab)
+
+		local toyAliases = {}
+		addAlias(toyAliases, loc and loc.ToysTab)
+
+		local nameToCanonical = {}
+		local defs = {
+			{"Companions", companionAliases},
+			{"Mounts",     mountAliases},
+			{"Toys",       toyAliases},
+		}
+		for _, def in ipairs(defs) do
+			local canonical, aliases = def[1], def[2]
+			nameToCanonical[canonical] = canonical
+			for _, alias in ipairs(aliases) do
+				if (alias ~= canonical) then
+					nameToCanonical[alias] = canonical
+				end
+			end
+		end
+
+		local numTabs = GetNumSpellTabs and GetNumSpellTabs() or 4
+		self.frame.customTabMap = self.frame.customTabMap or {}
+		local createdAny = false
+		local seen = {}
+
+		for i = 1, numTabs do
+			local tabName, _, _, numSpells = GetSpellTabInfo(i)
+			if (tabName and numSpells and numSpells > 0) then
+				local canonical = nameToCanonical[tabName]
+				if (canonical and not seen[canonical]) then
+					local tab = self:NewTab(MSB_L(canonical .. "Tab"))
+					-- Store the actual (possibly localised) tab name for data lookup
+					self.frame.customTabMap[tab.tab_number] = tabName
+					seen[canonical] = true
+					createdAny = true
+				end
+			end
+		end
+
+		if (createdAny) then
 			self.frame.otherTabCreated = true
 			self:PositionAllTabs()
 		end
@@ -898,7 +978,7 @@ class "CSpellBook"
 			return
 		end
 
-		self.frame.upcomingLabel:SetText("New spells at ".. nextLevel ..":")
+		self.frame.upcomingLabel:SetText(MSB_L("UpcomingLabel", nextLevel))
 		self.frame.upcomingFrame:Show()
 
 		local count = math.min(table.getn(upcoming), 10)
@@ -931,9 +1011,7 @@ class "CSpellBook"
 			local childName = child:GetName()
 			if (childName ~= "ModernSpellBookFrame" and childName ~= "SpellBookCloseButton") then
 				child:Hide()
-				if (child.UnregisterAllEvents) then
-					child:UnregisterAllEvents()
-				end
+				-- Do NOT UnregisterAllEvents — /msb toggle must be able to restore vanilla UI
 			end
 		end
 		-- Hide parchment background added by ShaguTweaks "Darkened UI" module
@@ -1078,6 +1156,7 @@ end
 local levelTracker = CreateFrame("Frame")
 levelTracker:RegisterEvent("PLAYER_LEVEL_UP")
 levelTracker:SetScript("OnEvent", function()
+	if (not ModernSpellBook_DB or not ModernSpellBook_DB.spells) then return end
 	-- Reset seen_trainable flags so newly available spells glow again
 	for key, entry in pairs(ModernSpellBook_DB.spells) do
 		if (not entry.learned) then

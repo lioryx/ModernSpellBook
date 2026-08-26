@@ -17,7 +17,7 @@ class "CActionBarHelper"
 	end;
 
 	HideButtonGrid = function(self, button)
-		if (ActionButton_ShowGrid == nil) then return end
+		if (ActionButton_HideGrid == nil) then return end
 		if (button.GetAttribute and button:GetAttribute("showgrid")) then
 			local showgrid = button:GetAttribute("showgrid")
 			if (showgrid > 0) then

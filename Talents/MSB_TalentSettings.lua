@@ -44,7 +44,7 @@ class "CTalentSettings"
 		if (level == 1) then
 			-- Grid lines submenu
 			local info = {}
-			info.text = "Grid lines"
+			info.text = MSB_L("TalentOptGridLines")
 			info.hasArrow = 1
 			info.notCheckable = 1
 			info.value = "gridLines"
@@ -52,7 +52,7 @@ class "CTalentSettings"
 
 			-- Reset position & scale
 			info = {}
-			info.text = "Reset position & scale"
+			info.text = MSB_L("TalentOptResetPosScale")
 			info.notCheckable = 1
 			info.func = function()
 				ModernSpellBook_DB.talentPosition = nil
@@ -72,7 +72,7 @@ class "CTalentSettings"
 				local gl = ModernSpellBook_DB.talentGridLines
 
 				local info = {}
-				info.text = "Vertical"
+				info.text = MSB_L("TalentOptVertical")
 				info.checked = gl.vertical
 				info.keepShownOnClick = 1
 				info.func = function()
@@ -82,7 +82,7 @@ class "CTalentSettings"
 				UIDropDownMenu_AddButton(info, level)
 
 				info = {}
-				info.text = "Diagonal"
+				info.text = MSB_L("TalentOptDiagonal")
 				info.checked = gl.diagonal
 				info.keepShownOnClick = 1
 				info.func = function()
@@ -92,7 +92,7 @@ class "CTalentSettings"
 				UIDropDownMenu_AddButton(info, level)
 
 				info = {}
-				info.text = "Horizontal"
+				info.text = MSB_L("TalentOptHorizontal")
 				info.checked = gl.horizontal
 				info.keepShownOnClick = 1
 				info.func = function()
@@ -103,7 +103,7 @@ class "CTalentSettings"
 
 				-- Coloring submenu
 				info = {}
-				info.text = "Coloring"
+				info.text = MSB_L("TalentOptColoring")
 				info.hasArrow = 1
 				info.notCheckable = 1
 				info.value = "gridLineColoring"
@@ -111,7 +111,7 @@ class "CTalentSettings"
 
 				-- Visibility submenu
 				info = {}
-				info.text = "Visibility"
+				info.text = MSB_L("TalentOptVisibility")
 				info.hasArrow = 1
 				info.notCheckable = 1
 				info.value = "gridLineVisibility"
@@ -127,7 +127,7 @@ class "CTalentSettings"
 				local visibility = gl.visibility or "unlocked"
 
 				local info = {}
-				info.text = "Always"
+				info.text = MSB_L("TalentOptAlways")
 				info.checked = (visibility == "always")
 				info.func = function()
 					gl.visibility = "always"
@@ -137,7 +137,7 @@ class "CTalentSettings"
 				UIDropDownMenu_AddButton(info, level)
 
 				info = {}
-				info.text = "Only unlocked"
+				info.text = MSB_L("TalentOptOnlyUnlocked")
 				info.checked = (visibility == "unlocked")
 				info.func = function()
 					gl.visibility = "unlocked"
@@ -154,7 +154,7 @@ class "CTalentSettings"
 				local coloring = gl.coloring or "unlocked"
 
 				local info = {}
-				info.text = "Always"
+				info.text = MSB_L("TalentOptAlways")
 				info.checked = (coloring == "always")
 				info.func = function()
 					gl.coloring = "always"
@@ -164,7 +164,7 @@ class "CTalentSettings"
 				UIDropDownMenu_AddButton(info, level)
 
 				info = {}
-				info.text = "Only unlocked"
+				info.text = MSB_L("TalentOptOnlyUnlocked")
 				info.checked = (coloring == "unlocked")
 				info.func = function()
 					gl.coloring = "unlocked"
@@ -174,7 +174,7 @@ class "CTalentSettings"
 				UIDropDownMenu_AddButton(info, level)
 
 				info = {}
-				info.text = "Never"
+				info.text = MSB_L("TalentOptNever")
 				info.checked = (coloring == "never")
 				info.func = function()
 					gl.coloring = "never"

@@ -46,7 +46,7 @@ class "CTalentIcon"
 		-- Rank text (bottom-right)
 		self.rank_text = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		self.rank_text:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -4, 4)
-		self.rank_text:SetFont("Fonts\\FRIZQT__.TTF", 9)
+		self.rank_text:SetFont(MSB_GetUIFont(), 9)
 		self.rank_text:SetTextColor(0.5, 0.5, 0.5)
 
 		-- Talent data
@@ -63,13 +63,17 @@ class "CTalentIcon"
 		self.prereq_tier = nil
 		self.prereq_column = nil
 		self.prereq_met = true
+		self.clickable = false
+		self.simulation_mode = false
 
 		-- Event handlers
 		local talent_icon = self
 		self.frame:SetScript("OnEnter", function()
 			talent_icon.hover_glow:Show()
 			GameTooltip:SetOwner(talent_icon.frame, "ANCHOR_RIGHT")
-			if (GameTooltip.SetTalent) then
+			if (talent_icon.simulation_mode and TalentSimulation) then
+				TalentSimulation:ShowSimTooltip(talent_icon.talent_tab, talent_icon.talent_index)
+			elseif (GameTooltip.SetTalent) then
 				GameTooltip:SetTalent(talent_icon.talent_tab, talent_icon.talent_index)
 			else
 				GameTooltip:SetText(talent_icon.talent_name)
@@ -84,8 +88,25 @@ class "CTalentIcon"
 
 		self.frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 		self.frame:SetScript("OnClick", function()
+			if (talent_icon.simulation_mode and TalentSimulation) then
+				if (not talent_icon.clickable) then return end
+				if (arg1 == "LeftButton") then
+					TalentSimulation:PlanTalent(talent_icon.talent_tab, talent_icon.talent_index)
+				elseif (arg1 == "RightButton") then
+					TalentSimulation:UnplanTalent(talent_icon.talent_tab, talent_icon.talent_index)
+				end
+				if (TalentTree and TalentTree.frame:IsVisible()) then
+					TalentTree:Refresh()
+				end
+				return
+			end
 			if (arg1 == "LeftButton") then
 				if (talent_icon.visual_state ~= "available" and talent_icon.visual_state ~= "partial") then
+					return
+				end
+				-- Don't call LearnTalent with no remaining points
+				local remaining = UnitCharacterPoints("player")
+				if (not remaining or remaining <= 0) then
 					return
 				end
 				if (LearnTalent) then
@@ -133,12 +154,23 @@ class "CTalentIcon"
 	end;
 
 	RefreshRank = function(self)
-		local _, _, _, _, currRank, maxRank = GetTalentInfo(self.talent_tab, self.talent_index)
-		if (currRank) then
-			self.curr_rank = currRank
-			self.max_rank = maxRank
-			self.rank_text:SetText(currRank .. "/" .. maxRank)
+		-- Text content only; color is owned by ApplyVisualState (gray/green/gold scheme).
+		if (self.simulation_mode and TalentSimulation) then
+			local plannedRank = TalentSimulation:GetPlannedRank(self.talent_tab, self.talent_index)
+			self.curr_rank = plannedRank
+			self.rank_text:SetText(plannedRank .. "/" .. self.max_rank)
+		else
+			local _, _, _, _, currRank, maxRank = GetTalentInfo(self.talent_tab, self.talent_index)
+			if (currRank) then
+				self.curr_rank = currRank
+				self.max_rank = maxRank
+				self.rank_text:SetText(currRank .. "/" .. maxRank)
+			end
 		end
+	end;
+
+	SetSimulationMode = function(self, enabled)
+		self.simulation_mode = enabled
 	end;
 
 	-- =================== FRAME SHAPE =============================
@@ -213,6 +245,9 @@ class "CTalentIcon"
 			self.visual_state = "locked_in_locked_tier"
 		end
 
+		self.clickable = (self.tier_unlocked and self.prereq_met and
+			(self.visual_state == "available" or self.visual_state == "partial" or self.visual_state == "maxed"))
+
 		self:ApplyVisualState()
 	end;
 
@@ -225,19 +260,10 @@ class "CTalentIcon"
 		local is_locked = (state == "locked_in_locked_tier") or (state == "locked_in_unlocked_tier")
 		
 		if (is_completely_locked) then
-			
-			self.rank_text:SetTextColor(0.5, 0.5, 0.5)
-		
-			if (self.is_exceptional) then
-                self.icon:SetAlpha(0.3)
-                self.border:SetAlpha(0.5)
-            else
-                self.icon:SetAlpha(0.3)
-    			self.border:SetAlpha(0.5)
-            end
-			
+			self.icon:SetAlpha(0.3)
+			self.border:SetAlpha(0.5)
+
 		else
-			self.rank_text:SetTextColor(1, 1, 1)
 			self.icon:SetAlpha(1)
 			self.border:SetAlpha(1)
 		end
@@ -281,6 +307,37 @@ class "CTalentIcon"
 			else
 				self.border:SetTexture(TALENT_ASSETS .. "talent-frame-circle-gold")
 			end
+		end
+
+		-- Simulation mode: cyan-tinted border/haze accent for planned talents
+		if (self.simulation_mode) then
+			self.rank_text:Show()
+			if (self.curr_rank > 0 and not is_locked) then
+				self.haze_tex:SetVertexColor(0.0, 0.8, 1.0)
+				self.haze_tex:SetAlpha(0.9)
+				if (self.is_exceptional) then
+					self.border:SetTexture(TALENT_ASSETS .. "talent-frame-square")
+					self.border:SetVertexColor(0.0, 1.0, 1.0)
+				else
+					self.border:SetTexture(TALENT_ASSETS .. "talent-frame-circle")
+					self.border:SetVertexColor(0.0, 1.0, 1.0)
+				end
+			elseif (state == "available") then
+				self.haze_tex:SetVertexColor(0.0, 0.6, 0.8)
+				self.haze_tex:SetAlpha(0.5)
+			end
+		else
+			-- Reset border vertex color when not in simulation mode
+			self.border:SetVertexColor(1, 1, 1)
+		end
+
+		-- Centralized rank-text coloring: gold (maxed), green (allocatable), gray (locked)
+		if (state == "maxed") then
+			self.rank_text:SetTextColor(1.0, 0.82, 0.0)
+		elseif (state == "available" or state == "partial") then
+			self.rank_text:SetTextColor(0.1, 1.0, 0.1)
+		else
+			self.rank_text:SetTextColor(0.5, 0.5, 0.5)
 		end
 	end;
 

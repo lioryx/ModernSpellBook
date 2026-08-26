@@ -4,7 +4,6 @@
 local function ClassCreate(name)
     if (_G[name] ~= nil) then
         error("Class " .. name .. " already exists!")
-        return
     end
 
     local class = {}
@@ -44,7 +43,7 @@ local function ClassDefinition(class)
                     error("Base class " .. superclasses .. " not found!")
                 end
             elseif (type(superclasses) == "table") then
-                for _, name in pairs(superclasses) do
+                for _, name in ipairs(superclasses) do
                     local superclass = _G[name]
                     if (superclass) then
                         ClassAddSuper(class, superclass)

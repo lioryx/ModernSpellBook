@@ -53,41 +53,70 @@ class "CTrainerDataService"
 
 		if (not isClassTrainer) then return end
 
-		-- Skip if we already scanned and trainer hasn't changed
-		if (ModernSpellBook_DB.trainerScanned and ModernSpellBook_DB.trainerServiceCount) then
-			if (numServices <= ModernSpellBook_DB.trainerServiceCount) then
-				return
+		-- Save current filter state so we can restore after scanning
+		local savedFilters = { available = 1, unavailable = 1, used = 1 }
+		local filterTypes = { "available", "unavailable", "used" }
+		if (GetTrainerServiceTypeFilter) then
+			for _, ft in ipairs(filterTypes) do
+				local ok, val = pcall(GetTrainerServiceTypeFilter, ft)
+				if (ok and val ~= nil) then
+					savedFilters[ft] = val
+				end
 			end
 		end
 
-		-- Enable all filters so we capture everything
+		local function restoreFilters()
+			pcall(function()
+				if (SetTrainerServiceTypeFilter) then
+					for _, ft in ipairs(filterTypes) do
+						SetTrainerServiceTypeFilter(ft, savedFilters[ft], 1)
+					end
+				end
+			end)
+		end
+
+		-- Enable all filters so we capture everything, then re-count
 		pcall(function()
 			if (SetTrainerServiceTypeFilter) then
-				SetTrainerServiceTypeFilter("available", 1, 0)
-				SetTrainerServiceTypeFilter("unavailable", 1, 0)
-				SetTrainerServiceTypeFilter("used", 1, 0)
+				SetTrainerServiceTypeFilter("available", 1, 1)
+				SetTrainerServiceTypeFilter("unavailable", 1, 1)
+				SetTrainerServiceTypeFilter("used", 1, 1)
 			end
 		end)
 
 		numServices = GetNumTrainerServices()
 
+		-- Skip if we already scanned and this trainer has no more services
+		if (ModernSpellBook_DB.trainerScanned and ModernSpellBook_DB.trainerServiceCount) then
+			if (numServices <= ModernSpellBook_DB.trainerServiceCount) then
+				restoreFilters()
+				return
+			end
+		end
+
 		local currentSpecHeader = GENERAL or "General"
 		local currentSpecIsValid = true
 
+		-- Dual-key English + zhCN (and common localized) category/skip tables
 		local generalCategories = {
-			["Defense"] = true,
-			["Weapons"] = true,
-			["Armor"] = true,
-			["Plate Mail"] = true,
-			["Mail"] = true,
-			["Leather"] = true,
-			["Shield"] = true,
+			["Defense"] = true, ["防御"] = true,
+			["Weapons"] = true, ["武器"] = true,
+			["Armor"] = true, ["护甲"] = true,
+			["Plate Mail"] = true, ["板甲"] = true,
+			["Mail"] = true, ["锁甲"] = true,
+			["Leather"] = true, ["皮甲"] = true,
+			["Shield"] = true, ["盾牌"] = true,
 		}
 
 		local skipSpells = {
-			["Plate Mail"] = true, ["Mail"] = true, ["Leather"] = true,
-			["Shield"] = true, ["Block"] = true, ["Parry"] = true, ["Dodge"] = true,
-			["Dual Wield"] = true,
+			["Plate Mail"] = true, ["板甲"] = true,
+			["Mail"] = true, ["锁甲"] = true,
+			["Leather"] = true, ["皮甲"] = true,
+			["Shield"] = true, ["盾牌"] = true,
+			["Block"] = true, ["格挡"] = true,
+			["Parry"] = true, ["招架"] = true,
+			["Dodge"] = true, ["躲闪"] = true,
+			["Dual Wield"] = true, ["双武器"] = true,
 		}
 
 		local capturedCount = 0
@@ -187,7 +216,9 @@ class "CTrainerDataService"
 		ModernSpellBook_DB.trainerScanned = true
 		ModernSpellBook_DB.trainerServiceCount = numServices
 
-		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r Captured " .. capturedCount .. " spells from trainer.")
+		restoreFilters()
+
+		DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00ModernSpellBook:|r " .. MSB_L("CmdCaptured", capturedCount))
 
 		if (ModernSpellBookFrame:IsVisible()) then
 			SpellBook:DrawPage()
@@ -227,7 +258,7 @@ class "CTrainerDataService"
 					if (nameTalent and currRank == 0) then
 						local trainerHas = false
 						for spellKey, entry in pairs(ModernSpellBook_DB.spells) do
-							if (not entry.learned and string.find(spellKey, nameTalent, 1, true)) then
+							if (not entry.learned and MSB_SpellNameFromKey(spellKey) == nameTalent) then
 								trainerHas = true
 								break
 							end
@@ -247,23 +278,23 @@ class "CTrainerDataService"
 		if (ModernSpellBook_DB.trainerScanned) then
 			for spellKey, entry in pairs(ModernSpellBook_DB.spells) do
 				if (not entry.learned) then
-					local pipePos = string.find(spellKey, "|", 1, true)
-					local name = string.sub(spellKey, 1, pipePos - 1)
-					local rank = string.sub(spellKey, pipePos + 1)
-
-					if (knownSet[spellKey]) then
+					local name = MSB_SpellNameFromKey(spellKey)
+					local rank = MSB_SpellRankFromKey(spellKey)
+					if (not name) then
+						-- skip malformed key
+					elseif (knownSet[spellKey]) then
 						entry.learned = true
 					else
-						local _, _, num = string.find(rank or "", "(%d+)")
-						local rankNum = tonumber(num) or 0
+						local rankNum = MSB_RankNumber(rank)
 						local highest = knownHighestRank[name]
 						if (highest and (rankNum <= highest or highest == 0)) then
 							entry.learned = true
 						else
-							local cat = entry.category or "Unknown"
+							local cat = entry.category or MSB_L("UnknownCategory")
 							if (not unlearnedByCategory[cat]) then
 								unlearnedByCategory[cat] = {}
 							end
+							local isPassive = (rank == (PASSIVE or "Passive") or rank == (PET_PASSIVE or "Passive"))
 							table.insert(unlearnedByCategory[cat], {
 								spellName = name,
 								spellRank = rank,
@@ -272,7 +303,7 @@ class "CTrainerDataService"
 								bookType = nil,
 								description = entry.desc,
 								cost = entry.cost,
-								isPassive = (rank == "Passive" or rank == PET_PASSIVE),
+								isPassive = isPassive,
 								isTalent = false,
 								isPetSpell = false,
 								isUnlearned = true,
@@ -297,7 +328,7 @@ class "CTrainerDataService"
 					if (nameTalent and currRank == 0) then
 						local isKnown = false
 						for knownKey, _ in pairs(knownSet) do
-							if (string.find(knownKey, nameTalent, 1, true)) then
+							if (MSB_SpellNameFromKey(knownKey) == nameTalent) then
 								isKnown = true
 								break
 							end
@@ -312,43 +343,34 @@ class "CTrainerDataService"
 
 							local alreadyAdded = false
 							for _, s in ipairs(unlearnedByCategory[talentGroupName]) do
-								if (s.spellName == nameTalent and (not trainerHasRanks or s.spellRank == "Rank 1")) then
-									alreadyAdded = true
-									break
+								-- Match by name; if trainer has ranks, prefer the lowest-rank entry
+								if (s.spellName == nameTalent) then
+									if (not trainerHasRanks or MSB_RankNumber(s.spellRank) == 1 or s.isTalent) then
+										alreadyAdded = true
+										break
+									end
 								end
 							end
 
 							if (not alreadyAdded) then
-								local rankLabel
-								local isPassiveTalent
-								if (trainerHasRanks) then
-									rankLabel = "Talent"
-									isPassiveTalent = false
-								elseif (maxRank == 1) then
-									rankLabel = "Talent"
-									isPassiveTalent = false
-								else
-									rankLabel = nil
-									isPassiveTalent = true
+								local showAsTalentGate = trainerHasRanks or (maxRank == 1)
+								if (showAsTalentGate) then
+									table.insert(unlearnedByCategory[talentGroupName], {
+										spellName = nameTalent,
+										spellRank = "",
+										spellIcon = icon,
+										spellID = nil,
+										bookType = nil,
+										isPassive = false,
+										isTalent = true,
+										talentGrid = {t, i},
+										isPetSpell = false,
+										isUnlearned = true,
+										levelReq = 10 + (tier - 1) * 5,
+										castName = nil,
+										category = talentGroupName,
+									})
 								end
-
-								if (rankLabel) then
-								table.insert(unlearnedByCategory[talentGroupName], {
-									spellName = nameTalent,
-									spellRank = rankLabel,
-									spellIcon = icon,
-									spellID = nil,
-									bookType = nil,
-									isPassive = isPassiveTalent,
-									isTalent = true,
-									talentGrid = {t, i},
-									isPetSpell = false,
-									isUnlearned = true,
-									levelReq = 10 + (tier - 1) * 5,
-									castName = nil,
-									category = talentGroupName,
-								})
-							end
 							end
 						end
 					end

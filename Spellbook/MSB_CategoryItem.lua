@@ -35,7 +35,7 @@ class "CCategoryItem"
 		self.text:SetPoint("LEFT", self.specIconFrame, "RIGHT", 5, 0)
 		self.text:SetTextColor(0, 0, 0)
 		self.text:SetShadowOffset(0, 0)
-		self.text:SetFont("Fonts\\FRIZQT__.TTF", 17)
+		self.text:SetFont(MSB_GetUIFont(), 17)
 
 		self.lightBorder = self.frame:CreateTexture(nil, "OVERLAY")
 		self.lightBorder:SetWidth(256)
@@ -85,12 +85,15 @@ class "CCategoryItem"
 		end
 		if (not specIconFound) then
 			self.specIconFrame:Hide()
+			self.text:ClearAllPoints()
 			self.text:SetPoint("LEFT", self.specIconFrame, "LEFT", 0, 0)
 		else
 			self.specIconFrame:Show()
+			self.text:ClearAllPoints()
 			self.text:SetPoint("LEFT", self.specIconFrame, "RIGHT", 5, 0)
 		end
 
+		self.frame:ClearAllPoints()
 		self.frame:SetPoint("TOPLEFT", ModernSpellBookFrame, "TOPLEFT", HORIZONTAL_OFFSET +SECOND_PAGE_OFFSET*(page -1), -80 +currentPageRows *-VERTICAL_SPACING -5)
 		self.frame:Show()
 	end;

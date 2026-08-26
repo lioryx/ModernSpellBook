@@ -8,11 +8,39 @@ function MSB_SpellKey(name, rank)
 	return name .. "|" .. (rank or "")
 end
 
+-- Extract spell name from a "Name|Rank" key (exact, no substring)
+function MSB_SpellNameFromKey(spellKey)
+	if (not spellKey) then return nil end
+	local pipePos = string.find(spellKey, "|", 1, true)
+	if (not pipePos) then return spellKey end
+	return string.sub(spellKey, 1, pipePos - 1)
+end
+
+-- Extract rank string from a "Name|Rank" key
+function MSB_SpellRankFromKey(spellKey)
+	if (not spellKey) then return "" end
+	local pipePos = string.find(spellKey, "|", 1, true)
+	if (not pipePos) then return "" end
+	return string.sub(spellKey, pipePos + 1)
+end
+
+-- Numeric rank from rank string (locale-safe: extracts digits)
+function MSB_RankNumber(rankStr)
+	if (not rankStr or rankStr == "") then return 0 end
+	local _, _, num = string.find(rankStr, "(%d+)")
+	return tonumber(num) or 0
+end
+
 local professionRanks = {
+	-- English
 	["Apprentice"] = true, ["Journeyman"] = true, ["Expert"] = true,
 	["Artisan"] = true, ["Master"] = true,
+	-- zhCN
+	["初级"] = true, ["中级"] = true, ["高级"] = true,
+	["专家级"] = true, ["大师级"] = true,
 }
 local professionSpells = {
+	-- English
 	["Basic Campfire"] = true, ["Find Herbs"] = true, ["Find Minerals"] = true,
 	["Find Fish"] = true, ["Find Trees"] = true, ["Smelting"] = true, ["Disenchant"] = true,
 	["Pick Lock"] = true, ["Prospecting"] = true, ["Milling"] = true,
@@ -22,6 +50,16 @@ local professionSpells = {
 	["Tailoring"] = true, ["Leatherworking"] = true, ["Blacksmithing"] = true,
 	["Engineering"] = true, ["Enchanting"] = true, ["Alchemy"] = true,
 	["Jewelcrafting"] = true, ["Inscription"] = true,
+	-- zhCN
+	["基础营火"] = true, ["寻找草药"] = true, ["寻找矿物"] = true,
+	["寻找鱼群"] = true, ["寻找木材"] = true, ["熔炼"] = true, ["分解"] = true,
+	["开锁"] = true, ["选矿"] = true, ["研磨"] = true,
+	["勘测"] = true, ["烹饪用火"] = true,
+	["采矿"] = true, ["草药学"] = true, ["剥皮"] = true,
+	["钓鱼"] = true, ["烹饪"] = true, ["急救"] = true,
+	["裁缝"] = true, ["制皮"] = true, ["锻造"] = true,
+	["工程学"] = true, ["附魔"] = true, ["炼金术"] = true,
+	["珠宝加工"] = true, ["铭文"] = true,
 }
 
 class "CSpellDataService"
@@ -103,27 +141,24 @@ class "CSpellDataService"
 			if (a.spellName ~= b.spellName) then
 				return a.spellName < b.spellName
 			end
-			local _, _, numA = string.find(a.spellRank or "", "(%d+)")
-			local _, _, numB = string.find(b.spellRank or "", "(%d+)")
-			return (tonumber(numA) or 0) < (tonumber(numB) or 0)
+			return MSB_RankNumber(a.spellRank) < MSB_RankNumber(b.spellRank)
 		end)
 	end;
 
 	-- ====================== FILTERING ============================
 
 	FilterHighestRanks = function(self, spellList)
-		local function getRankNum(rankStr)
+		local function getRankNum(rankStr, spellInfo)
+			if (spellInfo and spellInfo.isTalent) then return 1 end
 			if (not rankStr or rankStr == "") then return 0 end
-			if (rankStr == "Talent") then return 1 end
-			local _, _, num = string.find(rankStr, "(%d+)")
-			return tonumber(num) or 0
+			return MSB_RankNumber(rankStr)
 		end
 
 		local highestLearnedRank = {}
 		for _, spellInfo in ipairs(spellList) do
 			if (not spellInfo.isUnlearned) then
 				local name = spellInfo.spellName
-				local rankNum = getRankNum(spellInfo.spellRank)
+				local rankNum = getRankNum(spellInfo.spellRank, spellInfo)
 				if (not highestLearnedRank[name] or rankNum > highestLearnedRank[name]) then
 					highestLearnedRank[name] = rankNum
 				end
@@ -134,7 +169,7 @@ class "CSpellDataService"
 		for _, spellInfo in ipairs(spellList) do
 			if (spellInfo.isUnlearned) then
 				local name = spellInfo.spellName
-				local rankNum = getRankNum(spellInfo.spellRank)
+				local rankNum = getRankNum(spellInfo.spellRank, spellInfo)
 				local learnedRank = highestLearnedRank[name] or 0
 				if (rankNum > learnedRank) then
 					if (not nextUnlearnedRank[name] or rankNum < nextUnlearnedRank[name]) then
@@ -147,11 +182,13 @@ class "CSpellDataService"
 		local filtered = {}
 		for _, spellInfo in ipairs(spellList) do
 			local name = spellInfo.spellName
-			local rankNum = getRankNum(spellInfo.spellRank)
+			local rankNum = getRankNum(spellInfo.spellRank, spellInfo)
 			if (spellInfo.isUnlearned) then
 				if (nextUnlearnedRank[name] and rankNum == nextUnlearnedRank[name]) then
 					table.insert(filtered, spellInfo)
 				elseif (not highestLearnedRank[name] and rankNum == 0) then
+					table.insert(filtered, spellInfo)
+				elseif (spellInfo.isTalent and not highestLearnedRank[name]) then
 					table.insert(filtered, spellInfo)
 				end
 			else
@@ -166,7 +203,10 @@ class "CSpellDataService"
 	FilterSpells = function(self, filterString)
 		local keywords = {}
 		if (not filterString) then filterString = "" end
-		filterString = string.lower(string.gsub(string.gsub(filterString, "%%", ""), "^", ""))
+		-- Strip Lua pattern metacharacters that users might type; match with plain find below
+		filterString = string.lower(filterString)
+		filterString = string.gsub(filterString, "%%", "")
+		filterString = string.gsub(filterString, "%^", "")
 		for keyword in string.gmatch(filterString, "([^,; ]+)") do
 			table.insert(keywords, keyword)
 		end
@@ -182,13 +222,13 @@ class "CSpellDataService"
 
 				for _, keyword in ipairs(keywords) do
 					if (entry and entry.keywords) then
-						if (not string.find(entry.keywords, keyword)) then
+						if (not string.find(entry.keywords, keyword, 1, true)) then
 							isMatch = false
 							break
 						end
 					elseif (spellInfo.isUnlearned) then
 						local searchStr = string.lower(spellInfo.spellName .. ";" .. (spellInfo.spellRank or "") .. ";" .. (spellInfo.category or ""))
-						if (not string.find(searchStr, keyword)) then
+						if (not string.find(searchStr, keyword, 1, true)) then
 							isMatch = false
 							break
 						end
@@ -347,10 +387,19 @@ class "CSpellDataService"
 
 		-- Turtle WoW custom tabs to skip
 		local skipTabs = {}
-		if (COMPANIONS) then skipTabs[COMPANIONS] = true end
+		-- English canonical names (cover unlocalized clients)
 		skipTabs["Companions"] = true
 		skipTabs["Toys"] = true
 		skipTabs["Mounts"] = true
+		-- WoW client global is in the same encoding as GetSpellTabInfo, so it always matches
+		if (COMPANIONS) then skipTabs[COMPANIONS] = true end
+		-- Tabs identified by CreateCustomTabs (runs before DrawPage, covers localised names)
+		local customMap = ModernSpellBookFrame and ModernSpellBookFrame.customTabMap
+		if (customMap) then
+			for _, actualName in pairs(customMap) do
+				skipTabs[actualName] = true
+			end
+		end
 
 		local numTabs = GetNumSpellTabs and GetNumSpellTabs() or MAX_SKILLLINE_TABS or 4
 		for i = 1, numTabs do
@@ -392,9 +441,10 @@ class "CSpellDataService"
 			if (allSpellsDict[GENERAL]) then
 				local profSpells = {}
 				local generalSpells = {}
+				local professionsLabel = MSB_L("Professions")
 				for _, spellInfo in ipairs(allSpellsDict[GENERAL]) do
 					if (self:IsProfessionSpell(spellInfo)) then
-						spellInfo.category = "Professions"
+						spellInfo.category = professionsLabel
 						table.insert(profSpells, spellInfo)
 					else
 						table.insert(generalSpells, spellInfo)
@@ -402,7 +452,7 @@ class "CSpellDataService"
 				end
 				allSpellsDict[GENERAL] = generalSpells
 				if (table.getn(profSpells) > 0) then
-					allSpellsDict["Professions"] = profSpells
+					allSpellsDict[professionsLabel] = profSpells
 				end
 			end
 
@@ -432,7 +482,10 @@ class "CSpellDataService"
 			if (allSpellsDict[talentGroupName] == nil) then
 				local matched = false
 				for _, knownGroup in ipairs(existingCategories) do
-					if (string.find(string.lower(knownGroup), string.lower(string.sub(talentGroupName, 1, 4)))) then
+					-- Exact or case-insensitive full-string contain (no byte truncation — CJK-safe)
+					local kg = string.lower(knownGroup)
+					local tg = string.lower(talentGroupName)
+					if (kg == tg or string.find(kg, tg, 1, true) or string.find(tg, kg, 1, true)) then
 						talentGroupName = knownGroup
 						for _, spellInfo in ipairs(talents) do
 							spellInfo.category = talentGroupName
@@ -500,30 +553,21 @@ class "CSpellDataService"
 		return allSpellsDict
 	end;
 
-	GetOtherTabSpells = function(self)
-		local spellsDict = {}
-		local customTabNames = {"Companions", "Mounts", "Toys"}
-
-		for _, tabName in ipairs(customTabNames) do
-			local tabSpells = self:GetCustomTabSpells(tabName)
-			if (tabSpells[tabName] and table.getn(tabSpells[tabName]) > 0) then
-				spellsDict[tabName] = tabSpells[tabName]
-			end
-		end
-
-		return spellsDict
-	end;
-
 	GetAvailableSpells = function(self)
-		if (ModernSpellBookFrame.selectedTab == 1) then
+		local sel = ModernSpellBookFrame.selectedTab
+		if (sel == 1) then
 			return self:GetPlayerSpells(false), false
-		elseif (ModernSpellBookFrame.selectedTab == 2) then
+		elseif (sel == 2) then
 			return self:GetPlayerSpells(true), false
-		elseif (ModernSpellBookFrame.selectedTab == 3) then
+		elseif (sel == 3) then
 			return self:GetPetSpells(), true
-		elseif (ModernSpellBookFrame.selectedTab == 4) then
-			return self:GetOtherTabSpells(), false
 		else
+			-- Custom tabs (Companions / Mounts / Toys), one category each
+			local map = ModernSpellBookFrame.customTabMap
+			local category = map and map[sel]
+			if (category) then
+				return self:GetCustomTabSpells(category), false
+			end
 			return {}, false
 		end
 	end;
@@ -570,7 +614,9 @@ class "CSpellDataService"
 						found = true
 						break
 					end
-					if (string.find(string.lower(existingCat), string.lower(string.sub(category, 1, 4)))) then
+					local ec = string.lower(existingCat)
+					local cc = string.lower(category)
+					if (string.find(ec, cc, 1, true) or string.find(cc, ec, 1, true)) then
 						targetCat = existingCat
 						found = true
 						break
@@ -613,8 +659,7 @@ class "CSpellDataService"
 		local nextLevel = nil
 		for key, entry in pairs(ModernSpellBook_DB.spells) do
 			if (not entry.learned and entry.level_req) then
-				local pipePos = string.find(key, "|", 1, true)
-				local name = pipePos and string.sub(key, 1, pipePos - 1)
+				local name = MSB_SpellNameFromKey(key)
 				if (name and not talentBlocked[name]) then
 					local lvl = entry.level_req
 					if (lvl > playerLevel) then
@@ -631,17 +676,14 @@ class "CSpellDataService"
 		-- Collect all spells at that level (excluding talent-blocked)
 		for key, entry in pairs(ModernSpellBook_DB.spells) do
 			if (not entry.learned and entry.level_req == nextLevel) then
-				local pipePos = string.find(key, "|", 1, true)
-				if (pipePos) then
-					local name = string.sub(key, 1, pipePos - 1)
-					if (not talentBlocked[name]) then
-						table.insert(upcoming, {
-							name = name,
-							rank = string.sub(key, pipePos + 1),
-							icon = entry.icon,
-							desc = entry.desc,
-						})
-					end
+				local name = MSB_SpellNameFromKey(key)
+				if (name and not talentBlocked[name]) then
+					table.insert(upcoming, {
+						name = name,
+						rank = MSB_SpellRankFromKey(key),
+						icon = entry.icon,
+						desc = entry.desc,
+					})
 				end
 			end
 		end
@@ -678,11 +720,11 @@ class "CSpellDataService"
 		end
 
 		if (ModernSpellBook_DB.trainerScanned and unlearned > 0) then
-			ModernSpellBookFrame.spellCounter:SetText(learned .. "/" .. (learned + unlearned) .. " learned")
+			ModernSpellBookFrame.spellCounter:SetText(MSB_L("SpellCounterLearned", learned, learned + unlearned))
 		elseif (ModernSpellBook_DB.trainerScanned) then
-			ModernSpellBookFrame.spellCounter:SetText(learned .. " learned")
+			ModernSpellBookFrame.spellCounter:SetText(MSB_L("SpellCounterOnly", learned))
 		else
-			ModernSpellBookFrame.spellCounter:SetText(learned .. "/? learned")
+			ModernSpellBookFrame.spellCounter:SetText(MSB_L("SpellCounterUnknown", learned))
 		end
 		ModernSpellBookFrame.spellCounter:Show()
 	end;

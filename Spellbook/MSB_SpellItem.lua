@@ -42,7 +42,7 @@ class "CSpellItem"
 		if (self.nameText.SetWordWrap) then self.nameText:SetWordWrap(true) end
 		self.nameText:SetWidth(98)
 		self.nameText:SetJustifyH("LEFT")
-		self.nameText:SetFont("Fonts\\FRIZQT__.TTF", ModernSpellBook_DB and ModernSpellBook_DB.fontSize or 11.5)
+		self.nameText:SetFont(MSB_GetUIFont(), ModernSpellBook_DB and ModernSpellBook_DB.fontSize or 11.5)
 		if (self.nameText.SetJustifyV) then self.nameText:SetJustifyV("TOP") end
 
 		-- Trail background behind text
@@ -56,7 +56,7 @@ class "CSpellItem"
 		-- Rank / subtitle text
 		self.rankText = self.textGroup:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		self.rankText:SetPoint("TOPLEFT", self.nameText, "BOTTOMLEFT", 0, -1)
-		self.rankText:SetFont("Fonts\\FRIZQT__.TTF", 9.5)
+		self.rankText:SetFont(MSB_GetUIFont(), 9.5)
 		self.rankText:SetJustifyH("LEFT")
 		if (self.rankText.SetWordWrap) then self.rankText:SetWordWrap(true) end
 		self.rankText:SetWidth(80)
@@ -96,7 +96,7 @@ class "CSpellItem"
 					CastPetAction(spellInfo.castName)
 					C_Timer.After(0.2, function()
 						if (spellInfo.castName == nil) then
-							UIErrorsFrame:AddMessage("ModernSpellBook: Warning - Pet spell ".. spellInfo.spellName.. " cannot be cast outside the pet action bar. Please drag the spell there.", 1.0, 0.1, 0.1, 1.0)
+							UIErrorsFrame:AddMessage(MSB_L("PetSpellWarning", spellInfo.spellName or ""), 1.0, 0.1, 0.1, 1.0)
 							PlaySound("igQuestFailed")
 							return
 						end
@@ -104,7 +104,7 @@ class "CSpellItem"
 						iconTex:SetTexture(texture)
 					end)
 				else
-					UIErrorsFrame:AddMessage("ModernSpellBook: Warning - Pet spell ".. spellInfo.spellName.. " cannot be cast outside the pet action bar. Please drag the spell there.", 1.0, 0.1, 0.1, 1.0)
+					UIErrorsFrame:AddMessage(MSB_L("PetSpellWarning", spellInfo.spellName or ""), 1.0, 0.1, 0.1, 1.0)
 					PlaySound("igQuestFailed")
 				end
 			else
@@ -114,15 +114,15 @@ class "CSpellItem"
 	end;
 
 	SetTextContent = function(self, spellInfo)
-		self.nameText:SetFont("Fonts\\FRIZQT__.TTF", ModernSpellBook_DB and ModernSpellBook_DB.fontSize or 11.5)
+		self.nameText:SetFont(MSB_GetUIFont(), ModernSpellBook_DB and ModernSpellBook_DB.fontSize or 11.5)
 		self.spellIcon.icon:SetTexture(spellInfo.spellIcon)
 		self.nameText:SetText(spellInfo.spellName)
 		if (spellInfo.isUnlearned and spellInfo.levelReq and spellInfo.levelReq > 0) then
 			local rankText = spellInfo.spellRank or ""
 			if (rankText ~= "") then
-				self.rankText:SetText(rankText .. " (Lvl " .. spellInfo.levelReq .. ")")
+				self.rankText:SetText(rankText .. " (" .. MSB_L("LevelShort", spellInfo.levelReq) .. ")")
 			else
-				self.rankText:SetText("Lvl " .. spellInfo.levelReq)
+				self.rankText:SetText(MSB_L("LevelShort", spellInfo.levelReq))
 			end
 		else
 			self.rankText:SetText(spellInfo.spellRank)
@@ -171,16 +171,20 @@ class "CSpellItem"
 			if (not ChatFrameEditBox or not ChatFrameEditBox:IsVisible()) then return end
 
 			local displayName = spellInfo.spellName
-
-			-- Get real spell ID from spellbook slot (3rd return of GetSpellName)
-			local realSpellID = spellInfo.spellID
-			if (spellInfo.bookType) then
-				local _, _, sid = GetSpellName(spellInfo.spellID, spellInfo.bookType)
-				if (sid) then realSpellID = sid end
+			-- Vanilla GetSpellName only returns name, rank — no real spell ID.
+			-- Prefer GetSpellLink when available; otherwise insert plain text.
+			local link = nil
+			if (GetSpellLink and spellInfo.bookType and spellInfo.spellID) then
+				local ok, result = pcall(GetSpellLink, spellInfo.spellID, spellInfo.bookType)
+				if (ok and result and result ~= "") then
+					link = result
+				end
 			end
-
-			local link = "|cff71d5ff|Henchant:" .. realSpellID .. "|h[" .. displayName .. "]|h|r"
-			ChatFrameEditBox:Insert(link)
+			if (link) then
+				ChatFrameEditBox:Insert(link)
+			else
+				ChatFrameEditBox:Insert("[" .. displayName .. "]")
+			end
 		end)
 	end;
 
@@ -240,12 +244,12 @@ class "CSpellItem"
 					end
 				end
 				if (spellInfo.levelReq and spellInfo.levelReq > 0) then
-					GameTooltip:AddLine("Requires Level " .. spellInfo.levelReq, 1, 0.2, 0.2)
+					GameTooltip:AddLine(MSB_L("TooltipRequiresLevel", spellInfo.levelReq), 1, 0.2, 0.2)
 				end
 				if (spellInfo.isTalent) then
-					GameTooltip:AddLine("Requires talent point.", 1, 0.82, 0)
+					GameTooltip:AddLine(MSB_L("TooltipRequiresTalent"), 1, 0.82, 0)
 				else
-					GameTooltip:AddLine("Visit a class trainer to learn.", 1, 0.82, 0)
+					GameTooltip:AddLine(MSB_L("TooltipVisitTrainer"), 1, 0.82, 0)
 				end
 			elseif (not spellInfo.isTalent) then
 				if (spellInfo.bookType) then
@@ -254,15 +258,17 @@ class "CSpellItem"
 					MSB_SetTooltipSpell(spellInfo.spellID)
 				end
 			else
-				if (GameTooltip.SetTalent) then
-					GameTooltip:SetTalent(spellInfo.talentGrid[1], spellInfo.talentGrid[2])
-				else
+				if (spellInfo.talentGrid and GameTooltip.SetTalent) then
+					pcall(GameTooltip.SetTalent, GameTooltip, spellInfo.talentGrid[1], spellInfo.talentGrid[2])
+				elseif (spellInfo.talentGrid) then
 					local talentLink = MSB_GetTalentLink(spellInfo.talentGrid[1], spellInfo.talentGrid[2])
 					if (talentLink) then
 						GameTooltip:SetHyperlink(talentLink)
 					else
 						GameTooltip:SetText(spellInfo.spellName)
 					end
+				else
+					GameTooltip:SetText(spellInfo.spellName)
 				end
 			end
 			GameTooltip:Show()
@@ -339,6 +345,7 @@ class "CSpellItem"
 		self.spellIcon:SetHighlights(spellInfo, isNew)
 
 		-- Position on page
+		self.frame:ClearAllPoints()
 		self.frame:SetPoint("TOPLEFT", ModernSpellBookFrame, "TOPLEFT",
 			HORIZONTAL_OFFSET + SPELL_INSET + SECOND_PAGE_OFFSET*(page-1) + grid_x*SPELL_HORIZONTAL_SPACING,
 			-80 + currentPageRows * -VERTICAL_SPACING)

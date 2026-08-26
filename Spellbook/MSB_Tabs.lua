@@ -87,12 +87,19 @@ class "CTab"
 	end;
 
 	SetMinmaxPosition = function(self, isMainFrameMinimized, tabgroups)
+		local fs = self.frame:GetFontString()
+		if (fs) then
+			fs:ClearAllPoints()
+			if (isMainFrameMinimized) then
+				fs:SetPoint("CENTER", self.frame, "CENTER", 0, 2.5)
+			else
+				fs:SetPoint("CENTER", self.frame, "CENTER", 0, -2.5)
+			end
+		end
 		if (isMainFrameMinimized) then
-			self.frame:GetFontString():SetPoint("CENTER", self.frame, "CENTER", 0, 2.5)
 			self.frame:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
 			self.frame:GetHighlightTexture():SetTexCoord(0, 1, 0, 1)
 		else
-			self.frame:GetFontString():SetPoint("CENTER", self.frame, "CENTER", 0, -2.5)
 			self.frame:GetNormalTexture():SetTexCoord(0, 1, 1, 0)
 			self.frame:GetHighlightTexture():SetTexCoord(0, 1, 1, 0)
 		end

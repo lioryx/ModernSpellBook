@@ -99,7 +99,9 @@ SlashCmdList["MSBDEBUG"] = function()
 			if (allSpellsDict[talentGroupName] == nil) then
 				local matched = false
 				for _, knownGroup in ipairs(existingCategories) do
-					if (string.find(string.lower(knownGroup), string.lower(string.sub(talentGroupName, 1, 4)))) then
+					local kg = string.lower(knownGroup)
+					local tg = string.lower(talentGroupName)
+					if (kg == tg or string.find(kg, tg, 1, true) or string.find(tg, kg, 1, true)) then
 						c:AddMessage("  Phase 3: matched '" .. talentGroupName .. "' -> '" .. knownGroup .. "'")
 						talentGroupName = knownGroup
 						matched = true

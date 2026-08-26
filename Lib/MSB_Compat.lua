@@ -13,6 +13,7 @@ if not TALENT then TALENT = "Talent" end
 if not NEW then NEW = "New" end
 if not SPELLBOOK then SPELLBOOK = "Spellbook" end
 if not PET_PASSIVE then PET_PASSIVE = "Passive" end
+if not PASSIVE then PASSIVE = PET_PASSIVE or "Passive" end
 if not GENERAL then GENERAL = "General" end
 
 
@@ -35,7 +36,10 @@ if not C_Timer.After then
             local timer = timerFrame.timers[i]
             if now >= timer.endTime then
                 table.remove(timerFrame.timers, i)
-                timer.func()
+                local ok, err = pcall(timer.func)
+                if (not ok and DEFAULT_CHAT_FRAME) then
+                    DEFAULT_CHAT_FRAME:AddMessage("|cffff0000ModernSpellBook timer error:|r " .. tostring(err))
+                end
             else
                 i = i + 1
             end
@@ -87,7 +91,7 @@ function MSB_IsPassiveSpell(index, bookType)
     end
     bookType = bookType or BOOKTYPE_SPELL
     local _, rank = GetSpellName(index, bookType)
-    if rank and (rank == PASSIVE or rank == "Passive") then
+    if rank and (rank == PASSIVE or rank == PET_PASSIVE or rank == "Passive") then
         return true
     end
     return false
@@ -112,10 +116,10 @@ if not PRODUCT_CHOICE_PAGE_NUMBER then
     PRODUCT_CHOICE_PAGE_NUMBER = "Page %d / %d"
 end
 
+-- spellID here is a spellbook slot index (not a numeric FileDataID / spell ID).
+-- Always use SetSpell(slot, bookType); SetSpellByID expects a real spell ID.
 function MSB_SetTooltipSpell(spellID, bookType)
-    if (GameTooltip.SetSpellByID) then
-        GameTooltip:SetSpellByID(spellID, bookType)
-    elseif (spellID and type(spellID) == "number") then
+    if (spellID and type(spellID) == "number") then
         GameTooltip:SetSpell(spellID, bookType or BOOKTYPE_SPELL)
     end
 end
@@ -124,10 +128,7 @@ function MSB_GetTalentLink(tab, index)
     if (GetTalentLink) then
         return GetTalentLink(tab, index)
     end
-    local name = GetTalentInfo(tab, index)
-    if name then
-        return "|cff71d5ff[" .. name .. "]|r"
-    end
+    -- No valid hyperlink format on vanilla without GetTalentLink; callers must fall back.
     return nil
 end
 
@@ -154,21 +155,30 @@ do
     needsPolyfill = ok and result
 
     if needsPolyfill then
-        local testFrame = CreateFrame("Frame")
-        local mt = getmetatable(testFrame)
-        if mt and mt.__index and type(mt.__index) == "table" then
-            mt.__index.HookScript = function(frame, script, func)
-                local prev = frame:GetScript(script)
-                if prev then
-                    frame:SetScript(script, function(a1,a2,a3,a4,a5,a6,a7,a8,a9)
-                        prev(a1,a2,a3,a4,a5,a6,a7,a8,a9)
-                        func(a1,a2,a3,a4,a5,a6,a7,a8,a9)
-                    end)
-                else
-                    frame:SetScript(script, func)
+        local function installHookScript(widgetType)
+            local testFrame = CreateFrame(widgetType)
+            local mt = getmetatable(testFrame)
+            if mt and mt.__index and type(mt.__index) == "table" and not mt.__index.HookScript then
+                mt.__index.HookScript = function(frame, script, func)
+                    local prev = frame:GetScript(script)
+                    if prev then
+                        frame:SetScript(script, function()
+                            -- Vanilla uses this/argN globals; call both handlers safely
+                            local ok1, err1 = pcall(prev)
+                            local ok2, err2 = pcall(func)
+                            if (not ok1 or not ok2) and DEFAULT_CHAT_FRAME then
+                                DEFAULT_CHAT_FRAME:AddMessage("|cffff0000ModernSpellBook HookScript error:|r " .. tostring(err1 or err2))
+                            end
+                        end)
+                    else
+                        frame:SetScript(script, func)
+                    end
                 end
             end
         end
+        installHookScript("Frame")
+        pcall(installHookScript, "Button")
+        pcall(installHookScript, "CheckButton")
     end
 end
 
@@ -207,26 +217,18 @@ MSB_Textures = {
 -- Helper to resolve texture IDs to paths
 function MSB_ResolveTexture(textureIDOrPath)
     if type(textureIDOrPath) == "number" then
-        return MSB_Textures[textureIDOrPath] or ""
+        return MSB_Textures[textureIDOrPath] or nil
     end
     return textureIDOrPath
 end
 
--- ShowAllSpellRanksCheckbox - will be created properly by ModernSpellBook
--- Just ensure globals exist so references don't error during loading
-if not ShowAllSpellRanksCheckbox then
-    ShowAllSpellRanksCheckbox = nil
-end
-if not ShowAllSpellRanksCheckboxText then
-    ShowAllSpellRanksCheckboxText = nil
-end
-
--- SpellBookSpellIconsFrame stub (might not exist in vanilla)
-if not SpellBookSpellIconsFrame then
-    SpellBookSpellIconsFrame = CreateFrame("Frame", "SpellBookSpellIconsFrame", UIParent)
-    SpellBookSpellIconsFrame:SetWidth(1)
-    SpellBookSpellIconsFrame:SetHeight(1)
-    SpellBookSpellIconsFrame:Hide()
+-- Client-appropriate UI font path (avoids FRIZQT missing glyphs on CJK clients)
+function MSB_GetUIFont()
+    if (GameFontNormal and GameFontNormal.GetFont) then
+        local path = GameFontNormal:GetFont()
+        if (path and path ~= "") then return path end
+    end
+    return "Fonts\\FRIZQT__.TTF"
 end
 
 -- StanceBarFrame / ShapeshiftBarFrame compatibility

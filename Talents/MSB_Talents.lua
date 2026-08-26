@@ -81,9 +81,10 @@ class "CTalentService"
 		local talentGridPositions = self:GetAllTalents(false)
 		local keysToRemove = {}
 		for spellKey, entry in pairs(ModernSpellBook_DB.spells) do
+			local keyName = MSB_SpellNameFromKey(spellKey)
 			for talentGroupName, talents in pairs(talentGridPositions) do
 				for _, talentInfo in ipairs(talents) do
-					if (string.find(spellKey, talentInfo.spellName, 1, true)) then
+					if (keyName == talentInfo.spellName) then
 						table.insert(keysToRemove, spellKey)
 					end
 				end

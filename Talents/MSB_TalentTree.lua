@@ -20,6 +20,7 @@ local TOTAL_HEIGHT = PANEL_HEIGHT + 120
 local VERT_OFFSET = (TOTAL_HEIGHT - PANEL_HEIGHT) / 2
 
 local EXPANDED_HORIZONTAL_PADDING = 350
+local TALENT_POINTS_AT_60 = 51
 
 local TALENT_ASSETS = "Interface\\AddOns\\ModernSpellBook\\Assets\\Talents\\"
 
@@ -35,7 +36,6 @@ MSB_TALENT_CONSTANTS = {
 	TOTAL_WIDTH = TOTAL_WIDTH,
 	TOTAL_HEIGHT = TOTAL_HEIGHT,
 	EXPANDED_HORIZONTAL_PADDING = EXPANDED_HORIZONTAL_PADDING,
-	SPEC_DESCRIPTIONS = nil, -- set below after table is defined
 }
 
 -- Indexed by english class name then specIndex (1-3)
@@ -52,56 +52,201 @@ local SPEC_HAZE_COLORS = {
 }
 local DEFAULT_HAZE_COLOR = {0.2, 0.2, 0.4}
 
--- Indexed by english class name then specIndex (1-3)
-local SPEC_DESCRIPTIONS = {
-	WARRIOR = {
-		"The disciplined master of the battlefield. Wielding a massive two-handed weapon, this warrior relies on strict martial training and adaptive combat stances to outmaneuver their opponent. Every swing is deliberate, waiting for the perfect opening to deliver a devastating, precision strike that severely cripples the target's ability to heal and bleeds them out through deep, calculated wounds.",
-		"A reckless engine of momentum and pure wrath. Abandoning defense for sheer offensive output, this combatant wields twin blades to maximize strikes and keep their blood boiling. Thriving in the thick of melee, they willingly embrace a death wish, sacrificing their own armor and safety to fuel an unrelenting flurry of vicious attacks, overwhelming the enemy before their own vitality runs dry.",
-		"The iron bulwark holding the front line. Defined by heavy plate, a scarred shield, and absolute defiance, they control the flow of combat through demoralizing roars and bone-crushing shield bashes. They project a massive, threatening presence to keep the enemy's attention fixed entirely on them, weathering earth-shattering blows by bracing themselves behind steel, standing firm so the rest of the group can survive."
-	},
-	PALADIN = {
-		"The stalwart anchor of the vanguard. Wearing heavy plate armor while channeling divine light, they possess an unmatched physical resilience among those who mend the wounded. Through rigid devotion and spiritual efficiency, they sustain an endless stream of quick, radiant mending, keeping their allies standing through grueling wars of attrition while projecting unyielding, righteous auras of protection.",
-		"The devoted bastion against the undead and demonic hordes. Relying on searing the very earth beneath their foes' feet and reacting to incoming strikes with radiant barriers, they wear down multiple adversaries through holy retaliation. They are masters of endurance, absorbing physical punishment and reflecting it back as blinding light, turning their own armor into an instrument of absolute attrition.",
-		"The zealous inquisitor. A slow, methodical crusader who relies on heavy two-handed swings and the unpredictable, explosive power of divine judgment. They break their enemies' defenses through holy condemnation, capitalizing on fleeting moments of weakness to deliver crushing, deliberate blows of wrath, punishing those who thought they could outlast the light."
-	},
-	HUNTER = {
-		"A bonded survivalist fighting in perfect synchronization with an apex predator. This tracker channels their primal focus entirely into their tamed companion. Through shared instinct and roaring commands, the beast becomes a frenzied, unstoppable force, tearing through flesh and bone while the archer provides covering fire, ensuring any threat is mauled before it can close the distance.",
-		"The patient, lethal sniper. Operating at the absolute limits of physical range, they control the pacing of the skirmish with concussive blasts and disorienting volleys. They meticulously time their bowstring draws, waiting for the perfect moment to unleash a heavy, armor-piercing arrow, delivering calculated bursts of physical damage that drop a target before they even realize they are being hunted.",
-		"The rugged, tactical frontiersman. When the enemy inevitably closes in, they are already prepared. Relying on heightened agility and an arsenal of hidden, explosive traps, they excel at controlling the very earth of the battlefield. They punish melee attackers with debilitating counterattacks and venomous stings, proving that a tracker is just as dangerous in the dense brush as they are from a watchtower."
-	},
-	ROGUE = {
-		"The quiet executioner. Relying on potent, lingering venoms and pinpoint strikes to vital organs, this killer waits in the shadows for the singular, perfect opening. By exploiting moments of vulnerability and striking rapidly with twin daggers, they ensure their target’s lifeblood evaporates in a lethal, toxic instant, slipping away before the body even hits the ground.",
-		"The pragmatic frontline duelist. Forsaking the shadows for sheer martial prowess, this fighter stands toe-to-toe with their prey. Armed with swords or heavy maces, they maintain a relentless offensive pressure, weaving their blades in a blur of steel. When overwhelmed, they tap into reserves of pure adrenaline, matching multiple opponents blow for blow with blinding attack speed and unmatched parries.",
-		"The unseen manipulator of the battlefield. Dictating exactly when and how a fight begins, they are a phantom in the dark. Utilizing unparalleled camouflage and premeditated tactics, they cripple their target from the first strike, chaining precise, stunning blows that completely lock down the enemy's ability to react. If the odds ever turn against them, they vanish into thin air, resetting the board on their own terms."
-	},
-	PRIEST = {
-		"The ascetic channeler of absolute willpower. Rather than merely mending broken flesh, this cleric anticipates incoming trauma, mitigating fatal blows by wrapping their allies in shimmering, unbreakable barriers of pure faith. They bolster the minds and magical reserves of their comrades, acting as a tactical anchor who manages the momentum of the battle and prevents disasters before blood is even spilled.",
-		"The devout conduit of mending miracles. Commanding the most versatile restorative magic in the realm, they weave potent, deep healing with wide-reaching prayers that mend the entire vanguard at once. Deeply attuned to the spiritual plane, they are capable of pulling groups back from the absolute brink of death, offering a transcendent wave of salvation to those whose physical strength has entirely failed.",
-		"The orthodox outcast wielding forbidden magic. Slipping into a dark, ethereal form, they systematically tear apart the minds of their enemies. They layer agonizing, lingering curses and channel void energy to hobble their target’s very thoughts. They thrive on suffering, siphoning the fading life force of their adversaries to mend their own allies, turning the enemy's vitality into a weapon of survival."
-	},
-	SHAMAN = {
-		"The destructive channeler of the earth and sky. Calling upon the raw, violent forces of nature, they plant carved wards into the soil to anchor their power. They bypass armor entirely with sudden tremors and hurl chaining lightning through enemy ranks. By mastering the volatile elements, they guarantee devastating, localized storms that end skirmishes in a sudden burst of primal fury.",
-		"The tribal warrior imbued with the fury of the storm. Wielding a heavy, two-handed weapon, they enter the fray trusting in the ancestral spirits to guide their strikes. Every swing carries the potential of a sudden, violent tempest—a magically empowered flurry of extra, blindingly fast attacks capable of executing an opponent in a single, terrifying burst of physical force.",
-		"The spiritual mender. Calling upon the soothing properties of living water and resilient earth, they sustain the battle lines with ancestral grace. They are unmatched in group stabilization, weaving fluid waves of restorative magic that jump intelligently from one wounded ally to the next. By placing wards of deep renewal, they ensure the group's mental and magical reserves long outlast the enemy's stamina."
-	},
-	MAGE = {
-		"The master of raw, unfettered magical essence. Tapping directly into the world's leylines, they sacrifice all efficiency for overwhelming cosmic superiority. By manipulating the very fabric of time and intellect, they can instantly unleash energies of immense destructive force. When their mental reserves run dry, they draw the ambient magic of the air back into their mind, ready to strike again.",
-		"The volatile pyromancer. Focused entirely on maximizing sheer, destructive throughput, they weave molten embers and searing blasts to build up terrifying layers of heat. They chain critical, explosive strikes together, leaving deep, burning wounds on the target. It is a dangerous, reckless dance of power, pushing their fiery output to the absolute limit to incinerate the enemy before they can even draw near.",
-		"The pragmatic controller of the battlefield. Dictating the pace of every engagement, they rely on chilling magic to slow their charging enemies to a frozen crawl. Shielded by an impenetrable barrier of ice, they lock down groups with localized blizzards and shattering cold, taking advantage of immobilized targets to deliver lethal, piercing strikes. If caught, they encase themselves in solid frost to survive otherwise fatal blows."
-	},
-	WARLOCK = {
-		"The harbinger of inevitable decay. Layering their target in dark hexes and vile corruptions, they rely on debilitating, lingering magic to secure victory. Through dark siphoning and soul-draining rituals, they slowly and methodically extract the vitality from their enemy. It is a terrifying war of attrition where the opponent slowly rots away from the inside, unable to halt their own fading strength.",
-		"The dark summoner. Drawing their power from the chaotic nether, they treat their summoned horrors not just as servants, but as a source of dark survival. Through forbidden bonds, they share physical pain with their abyssal minions, making the spellcaster incredibly difficult to kill. They are entirely willing to sacrifice their own creations at a moment's notice to absorb raw, demonic power into their own veins.",
-		"The reckless caster of fel-fire. Channeling the chaotic, burning energy of the abyss, they are a dark reflection of traditional spellcasters. They utilize harvested soul fragments to hurl massive, chaotic infernos, executing fleeing enemies with sudden bursts of dark flame. Their magic is highly volatile and destructive, focused on overwhelming, scorching force that leaves nothing behind but cursed ash."
-	},
-	DRUID = {
-		"The warden of nature's cosmic equilibrium. Commanding the astral energies of the moon and the blinding wrath of the sun, they take on the heavily armored form of a mystical avian beast. Standing at range, they weave thorny roots and celestial light to weaken targets before calling down heavy, methodical columns of astral fire, punishing interlopers with the raw, untamed power of the night sky.",
-		"The primal shapeshifter. Abandoning the incantations of a spellcaster, they adapt perfectly to the physical demands of raw combat. Taking the form of a great jungle cat, they prowl unseen, shredding armor and bleeding targets with precise, ferocious strikes. When the battle requires a vanguard, they shift into a massive, thick-hided bear, generating furious resilience to act as an impenetrable wall of fur and muscle.",
-		"The cultivator of wild life. Excelling at sustaining their allies through layered, blooming magic, they create a buffer of constant mending that allows their group to push through heavy, sustained damage. They coax the very flora of the battlefield to wrap around their comrades, and in moments of dire crisis, they instantly breathe the restorative tranquility of the deep forest back into a fallen ally."
-	}
+function MSB_GetSpecDescription(englishClass, specIndex)
+	return MSB_L("SpecDesc_" .. englishClass .. "_" .. specIndex)
+end
+
+StaticPopupDialogs["MSB_SIM_RENAME_PLAN"] = {
+	text = MSB_L("SimRenamePrompt"),
+	button1 = OKAY,
+	button2 = CANCEL,
+	hasEditBox = 1,
+	maxLetters = 32,
+	OnAccept = function()
+		local editBox = getglobal(this:GetParent():GetName() .. "EditBox")
+		if (editBox and TalentSimulation) then
+			local newName = editBox:GetText()
+			if (newName and newName ~= "") then
+				TalentSimulation:SetPlanName(newName)
+				if (TalentTree) then
+					TalentTree:UpdateSimControls()
+				end
+			end
+		end
+	end,
+	EditBoxOnEnterPressed = function()
+		local editBox = this
+		if (editBox and TalentSimulation) then
+			local newName = editBox:GetText()
+			if (newName and newName ~= "") then
+				TalentSimulation:SetPlanName(newName)
+				if (TalentTree) then
+					TalentTree:UpdateSimControls()
+				end
+			end
+		end
+		this:GetParent():Hide()
+	end,
+	timeout = 0,
+	whileDead = 1,
+	hideOnEscape = 1,
 }
-local DEFAULT_SPEC_DESCRIPTION = ""
-MSB_TALENT_CONSTANTS.SPEC_DESCRIPTIONS = SPEC_DESCRIPTIONS
+
+StaticPopupDialogs["MSB_SIM_SAVE_PLAN"] = {
+	text = MSB_L("SimSavePrompt"),
+	button1 = OKAY,
+	button2 = CANCEL,
+	hasEditBox = 1,
+	maxLetters = 32,
+	OnShow = function()
+		local editBox = getglobal(this:GetName() .. "EditBox")
+		if (editBox and TalentSimulation) then
+			editBox:SetText(TalentSimulation:GetPlanName() or "")
+			editBox:HighlightText()
+		end
+	end,
+	OnAccept = function()
+		local editBox = getglobal(this:GetParent():GetName() .. "EditBox")
+		if (editBox and TalentSimulation) then
+			local newName = editBox:GetText()
+			if (newName and newName ~= "") then
+				TalentSimulation:SaveWorkingPlan(newName)
+				MSB_SimulationNotify(MSB_L("SimPlanSaved", newName))
+				if (TalentTree) then
+					TalentTree:UpdateSimControls()
+					TalentTree:Refresh()
+				end
+			end
+		end
+	end,
+	EditBoxOnEnterPressed = function()
+		local editBox = this
+		if (editBox and TalentSimulation) then
+			local newName = editBox:GetText()
+			if (newName and newName ~= "") then
+				TalentSimulation:SaveWorkingPlan(newName)
+				MSB_SimulationNotify(MSB_L("SimPlanSaved", newName))
+				if (TalentTree) then
+					TalentTree:UpdateSimControls()
+					TalentTree:Refresh()
+				end
+			end
+		end
+		this:GetParent():Hide()
+	end,
+	timeout = 0,
+	whileDead = 1,
+	hideOnEscape = 1,
+}
+
+StaticPopupDialogs["MSB_SIM_RENAME_SAVED"] = {
+	text = MSB_L("SimRenamePrompt"),
+	button1 = OKAY,
+	button2 = CANCEL,
+	hasEditBox = 1,
+	maxLetters = 32,
+	OnAccept = function()
+		local editBox = getglobal(this:GetParent():GetName() .. "EditBox")
+		if (editBox and TalentSimulation and MSB_SimRenameSavedIndex) then
+			local newName = editBox:GetText()
+			if (newName and newName ~= "") then
+				TalentSimulation:RenameSavedPlan(MSB_SimRenameSavedIndex, newName)
+				if (TalentTree) then
+					TalentTree:UpdateSimControls()
+				end
+			end
+		end
+		MSB_SimRenameSavedIndex = nil
+	end,
+	EditBoxOnEnterPressed = function()
+		local editBox = this
+		if (editBox and TalentSimulation and MSB_SimRenameSavedIndex) then
+			local newName = editBox:GetText()
+			if (newName and newName ~= "") then
+				TalentSimulation:RenameSavedPlan(MSB_SimRenameSavedIndex, newName)
+				if (TalentTree) then
+					TalentTree:UpdateSimControls()
+				end
+			end
+		end
+		MSB_SimRenameSavedIndex = nil
+		this:GetParent():Hide()
+	end,
+	timeout = 0,
+	whileDead = 1,
+	hideOnEscape = 1,
+}
+
+StaticPopupDialogs["MSB_SIM_EXPORT"] = {
+	text = MSB_L("SimExportPrompt"),
+	button1 = OKAY,
+	hasEditBox = 1,
+	maxLetters = 255,
+	OnShow = function()
+		local editBox = getglobal(this:GetName() .. "EditBox")
+		if (editBox and TalentSimulation) then
+			editBox:SetText(TalentSimulation:ExportWorkingPlan())
+			editBox:HighlightText()
+			editBox:SetFocus()
+		end
+	end,
+	EditBoxOnEnterPressed = function()
+		this:GetParent():Hide()
+	end,
+	EditBoxOnEscapePressed = function()
+		this:GetParent():Hide()
+	end,
+	timeout = 0,
+	whileDead = 1,
+	hideOnEscape = 1,
+}
+
+StaticPopupDialogs["MSB_SIM_IMPORT"] = {
+	text = MSB_L("SimImportPrompt"),
+	button1 = OKAY,
+	button2 = CANCEL,
+	hasEditBox = 1,
+	maxLetters = 255,
+	OnShow = function()
+		local editBox = getglobal(this:GetName() .. "EditBox")
+		if (editBox) then
+			editBox:SetText("")
+			editBox:SetFocus()
+		end
+	end,
+	OnAccept = function()
+		local editBox = getglobal(this:GetParent():GetName() .. "EditBox")
+		if (editBox and TalentSimulation) then
+			MSB_DoTalentImport(editBox:GetText())
+		end
+	end,
+	EditBoxOnEnterPressed = function()
+		local editBox = this
+		if (editBox and TalentSimulation) then
+			MSB_DoTalentImport(editBox:GetText())
+		end
+		this:GetParent():Hide()
+	end,
+	timeout = 0,
+	whileDead = 1,
+	hideOnEscape = 1,
+}
+
+function MSB_DoTalentImport(str)
+	if (not TalentSimulation) then return end
+	local ok, reason = TalentSimulation:ImportPlan(str)
+	if (ok) then
+		MSB_SimulationNotify(MSB_L("SimImportSuccess"))
+		if (TalentTree) then
+			TalentTree:UpdateSimControls()
+			TalentTree:Refresh()
+		end
+	elseif (reason == "class") then
+		MSB_SimulationNotify(MSB_L("SimImportFailClass"))
+	else
+		MSB_SimulationNotify(MSB_L("SimImportFailFormat"))
+	end
+end
 
 class "CTalentTree"
 {
@@ -196,8 +341,88 @@ class "CTalentTree"
 		-- Points display
 		self.points_text = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 		self.points_text:SetPoint("BOTTOM", self.frame, "BOTTOM", 0, 30)
-		self.points_text:SetFont("Fonts\\FRIZQT__.TTF", 14)
+		self.points_text:SetFont(MSB_GetUIFont(), 14)
 		self.points_text:SetTextColor(1.0, 1.0, 1.0)
+
+		-- ===== Top-right simulation control cluster (left of settings gear) =====
+		local tree_ref = self
+		local function EnsureSim()
+			if (not TalentSimulation) then
+				TalentSimulation = CTalentSimulation()
+				TalentSimulation:Load()
+			end
+		end
+
+		local function MakeClusterButton(width, text)
+			local btn = CreateFrame("Button", nil, tree_ref.frame, "UIPanelButtonTemplate")
+			btn:SetWidth(width)
+			btn:SetHeight(20)
+			btn:SetFrameLevel(tree_ref.frame:GetFrameLevel() + 20)
+			btn:SetText(text)
+			return btn
+		end
+
+		-- Mode toggle (always visible, nearest the gear)
+		self.sim_mode_btn = MakeClusterButton(70, MSB_L("SimToggleMode"))
+		self.sim_mode_btn:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -55, -22)
+		self.sim_mode_btn:SetScript("OnClick", function()
+			EnsureSim()
+			TalentSimulation:ToggleMode()
+			tree_ref:UpdateSimControls()
+			tree_ref:Refresh()
+		end)
+
+		-- Save plan
+		self.sim_save_btn = MakeClusterButton(70, MSB_L("SimSavePlan"))
+		self.sim_save_btn:SetPoint("RIGHT", self.sim_mode_btn, "LEFT", -4, 0)
+		self.sim_save_btn:SetScript("OnClick", function()
+			EnsureSim()
+			StaticPopup_Show("MSB_SIM_SAVE_PLAN", TalentSimulation:GetPlanName())
+		end)
+		self.sim_save_btn:Hide()
+
+		-- Plan list (opens dropdown)
+		self.sim_list_btn = MakeClusterButton(80, MSB_L("SimPlanList"))
+		self.sim_list_btn:SetPoint("RIGHT", self.sim_save_btn, "LEFT", -4, 0)
+		self.sim_list_btn:Hide()
+
+		-- Apply plan
+		self.sim_apply_btn = MakeClusterButton(80, MSB_L("SimApplyPlan"))
+		self.sim_apply_btn:SetPoint("RIGHT", self.sim_list_btn, "LEFT", -4, 0)
+		self.sim_apply_btn:SetScript("OnClick", function()
+			EnsureSim()
+			TalentSimulation:BeginApply()
+			tree_ref:Refresh()
+		end)
+		self.sim_apply_btn:Hide()
+
+		-- Reset plan
+		self.sim_reset_btn = MakeClusterButton(80, MSB_L("SimResetPlan"))
+		self.sim_reset_btn:SetPoint("RIGHT", self.sim_apply_btn, "LEFT", -4, 0)
+		self.sim_reset_btn:SetScript("OnClick", function()
+			EnsureSim()
+			TalentSimulation:ResetPlan()
+			tree_ref:Refresh()
+		end)
+		self.sim_reset_btn:Hide()
+
+		-- Working plan name label (left of the cluster)
+		self.plan_name_label = self.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		self.plan_name_label:SetPoint("RIGHT", self.sim_reset_btn, "LEFT", -8, 0)
+		self.plan_name_label:SetFont(MSB_GetUIFont(), 12)
+		self.plan_name_label:SetTextColor(0, 1, 1)
+		self.plan_name_label:Hide()
+
+		-- Plan list dropdown
+		self.plan_list_dropdown = CreateFrame("Frame", "ModernTalentPlanListDropDown", self.frame)
+		self.plan_list_dropdown.displayMode = "MENU"
+		self.plan_list_dropdown.initialize = function(level)
+			tree_ref:InitializePlanListDropdown(level)
+		end
+		self.sim_list_btn:SetScript("OnClick", function()
+			EnsureSim()
+			ToggleDropDownMenu(1, nil, tree_ref.plan_list_dropdown, tree_ref.sim_list_btn, 0, 0)
+		end)
 
 		self.enabled = true
 
@@ -206,6 +431,9 @@ class "CTalentTree"
 		self.event_frame:RegisterEvent("PLAYER_TALENT_UPDATE")
 		self.event_frame:RegisterEvent("CHARACTER_POINTS_CHANGED")
 		self.event_frame:SetScript("OnEvent", function()
+			if (TalentSimulation and TalentSimulation:IsApplying()) then
+				TalentSimulation:ContinueApply()
+			end
 			if (tree.frame:IsVisible()) then
 				tree:Refresh()
 			end
@@ -224,11 +452,42 @@ class "CTalentTree"
 		self.back_btn:SetWidth(60)
 		self.back_btn:SetHeight(22)
 		self.back_btn:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 12, -12)
-		self.back_btn:SetText("Back")
+		self.back_btn:SetText(MSB_L("TalentBack"))
 		self.back_btn:SetFrameLevel(self.frame:GetFrameLevel() + 20)
 		self.back_btn:Hide()
 		self.back_btn:SetScript("OnClick", function()
 			tree:CollapseSpec()
+		end)
+
+		-- Share / Import buttons (top-left, in line with the right-side sim cluster)
+		self.sim_share_btn = CreateFrame("Button", nil, self.frame, "UIPanelButtonTemplate")
+		self.sim_share_btn:SetWidth(60)
+		self.sim_share_btn:SetHeight(20)
+		self.sim_share_btn:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 24, -22)
+		self.sim_share_btn:SetFrameLevel(self.frame:GetFrameLevel() + 20)
+		self.sim_share_btn:SetText(MSB_L("SimShare"))
+		self.sim_share_btn:Hide()
+		self.sim_share_btn:SetScript("OnClick", function()
+			if (not TalentSimulation) then
+				TalentSimulation = CTalentSimulation()
+				TalentSimulation:Load()
+			end
+			StaticPopup_Show("MSB_SIM_EXPORT")
+		end)
+
+		self.sim_import_btn = CreateFrame("Button", nil, self.frame, "UIPanelButtonTemplate")
+		self.sim_import_btn:SetWidth(60)
+		self.sim_import_btn:SetHeight(20)
+		self.sim_import_btn:SetPoint("LEFT", self.sim_share_btn, "RIGHT", 4, 0)
+		self.sim_import_btn:SetFrameLevel(self.frame:GetFrameLevel() + 20)
+		self.sim_import_btn:SetText(MSB_L("SimImport"))
+		self.sim_import_btn:Hide()
+		self.sim_import_btn:SetScript("OnClick", function()
+			if (not TalentSimulation) then
+				TalentSimulation = CTalentSimulation()
+				TalentSimulation:Load()
+			end
+			StaticPopup_Show("MSB_SIM_IMPORT")
 		end)
 
 	end;
@@ -243,6 +502,10 @@ class "CTalentTree"
 				self:BuildSpecs()
 				self.built = true
 			end
+			if (not TalentSimulation) then
+				TalentSimulation = CTalentSimulation()
+				TalentSimulation:Load()
+			end
 			self:Refresh()
 			self.frame:Show()
 		end
@@ -252,7 +515,7 @@ class "CTalentTree"
 
 	BuildSpecs = function(self)
 		local className, englishClass = UnitClass("player")
-		self.title:SetText(className .. " Talents")
+		self.title:SetText(MSB_L("TalentTitle", tostring(className)))
 
 		-- Class icon before title
 		local titleIconFrame = CreateFrame("Frame", nil, self.frame)
@@ -331,19 +594,33 @@ class "CTalentTree"
 			-- Spec header
 			local header = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 			header:SetPoint("TOP", panel, "TOP", 0, -12)
-			header:SetFont("Fonts\\FRIZQT__.TTF", 14)
+			header:SetFont(MSB_GetUIFont(), 14)
 			header:SetText(string.upper(tabName))
 			header:SetTextColor(1, 1, 1)
 
-			-- Points counter
-			local ptsText = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-			ptsText:SetPoint("TOP", header, "BOTTOM", 0, -4)
-			ptsText:SetFont("Fonts\\FRIZQT__.TTF", 12)
-            if (pointsSpent == 0) then
-			    ptsText:SetTextColor(0.6, 0.6, 0.6)
-            else
-                ptsText:SetTextColor(1.0, 1.0, 1.0)
-            end
+			-- Per-branch reset button (simulation mode only; top-right of panel)
+			local resetSpecIndex = t
+			local resetBtn = CreateFrame("Button", nil, panel)
+			resetBtn:SetWidth(16)
+			resetBtn:SetHeight(16)
+			resetBtn:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -8, -8)
+			resetBtn:SetFrameLevel(panel:GetFrameLevel() + 10)
+			resetBtn:SetNormalTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
+			resetBtn:SetPushedTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Down")
+			resetBtn:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+			resetBtn:SetScript("OnEnter", function()
+				GameTooltip:SetOwner(resetBtn, "ANCHOR_RIGHT")
+				GameTooltip:SetText(MSB_L("SimBranchReset"), 1, 1, 1)
+				GameTooltip:Show()
+			end)
+			resetBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+			resetBtn:SetScript("OnClick", function()
+				if (TalentSimulation) then
+					TalentSimulation:ResetTree(resetSpecIndex)
+					TalentTree:Refresh()
+				end
+			end)
+			resetBtn:Hide()
 
 			-- Talent grid
 			local classColors = SPEC_HAZE_COLORS[englishClass]
@@ -364,7 +641,7 @@ class "CTalentTree"
 			table.insert(self.specs, {
 				panel = panel,
 				header = header,
-				points_text = ptsText,
+				reset_btn = resetBtn,
 				grid = grid,
 				tab_index = t,
 				tab_name = tabName,
@@ -376,18 +653,16 @@ class "CTalentTree"
 	-- ==================== REBUILD GRIDS ===========================
 
 	RebuildAllGrids = function(self)
-		local _, englishClass = UnitClass("player")
-		local col_offset = (GRID_COLS_MAX - GRID_COLS_DEFAULT) * CELL_SIZE / 2
-		local classColors = SPEC_HAZE_COLORS[englishClass]
 		for _, spec in ipairs(self.specs) do
-			spec.grid:Hide()
-			local haze_color = (classColors and classColors[spec.tab_index]) or DEFAULT_HAZE_COLOR
-			spec.grid = CTalentGrid(spec.panel, spec.tab_index, CELL_SIZE,
-				PANEL_INNER_PAD + col_offset, HEADER_HEIGHT + GRID_VERT_PAD,
-				haze_color, GRID_ROWS)
+			if (spec.grid and spec.grid.RebuildGridLines) then
+				spec.grid:RebuildGridLines()
+			end
 		end
-		-- Rebuild expanded view if open
-		if (self.expanded_spec) then
+		-- Refresh expanded view grid lines if open (reuse, don't recreate)
+		if (self.expanded_spec and self.expanded_view and self.expanded_view.grid) then
+			self.expanded_view.grid:RebuildGridLines()
+			local _, englishClass = UnitClass("player")
+			local classColors = SPEC_HAZE_COLORS[englishClass]
 			local spec = self.specs[self.expanded_spec]
 			self.expanded_view:Show(spec, self.expanded_spec, classColors)
 		end
@@ -440,9 +715,21 @@ class "CTalentTree"
 		local totalAvailable = UnitLevel("player") - 9
 		if (totalAvailable < 0) then totalAvailable = 0 end
 
+		local isSimulated = (TalentSimulation and TalentSimulation:IsSimulated()) or false
+
 		for _, spec in ipairs(self.specs) do
 			local _, _, pointsSpent = GetTalentTabInfo(spec.tab_index)
-			spec.points_text:SetText(pointsSpent .. " points")
+			local displayPts = pointsSpent
+			if (isSimulated and TalentSimulation) then
+				displayPts = TalentSimulation:GetPlannedPointsInTab(spec.tab_index)
+			end
+			-- Branch name followed by its current point count
+			spec.header:SetText(string.upper(spec.tab_name) .. " (" .. displayPts .. ")")
+			if (displayPts == 0) then
+				spec.header:SetTextColor(0.6, 0.6, 0.6)
+			else
+				spec.header:SetTextColor(1.0, 1.0, 1.0)
+			end
 			totalSpent = totalSpent + pointsSpent
 		end
 
@@ -459,10 +746,148 @@ class "CTalentTree"
 			self.expanded_view.grid:Refresh(pointsSpent, remaining)
 		end
 
-		if (remaining > 0) then
-			self.points_text:SetText("|cff00ff00" .. remaining .. "|r TALENT POINT AVAILABLE")
+		if (isSimulated and TalentSimulation) then
+			local simRemaining = TALENT_POINTS_AT_60 - TalentSimulation:GetTotalPlannedPoints()
+			if (simRemaining > 0) then
+				self.points_text:SetText(MSB_L("SimModeLabel") .. " " .. MSB_L("TalentPointAvailable", "|cff00ffff" .. simRemaining .. "|r"))
+			else
+				self.points_text:SetText(MSB_L("SimModeLabel") .. " " .. MSB_L("NoTalentPointsAvailable"))
+			end
 		else
-			self.points_text:SetText("NO TALENT POINTS AVAILABLE")
+			if (remaining > 0) then
+				self.points_text:SetText(MSB_L("TalentPointAvailable", "|cff00ff00" .. remaining .. "|r"))
+			else
+				self.points_text:SetText(MSB_L("NoTalentPointsAvailable"))
+			end
+		end
+
+		self:UpdateSimControls()
+	end;
+
+	-- ================ SIMULATION CONTROLS ========================
+
+	UpdateSimControls = function(self)
+		if (not TalentSimulation) then return end
+
+		local isSimulated = TalentSimulation:IsSimulated()
+
+		-- Mode toggle reflects current mode
+		if (isSimulated) then
+			self.sim_mode_btn:SetText(MSB_L("SimModeSimulated"))
+			self.sim_mode_btn:SetTextColor(0, 1, 1)
+		else
+			self.sim_mode_btn:SetText(MSB_L("SimModeLearned"))
+			self.sim_mode_btn:SetTextColor(1, 1, 1)
+		end
+
+		-- Working plan name label
+		self.plan_name_label:SetText(MSB_L("SimPlanLabel") .. " " .. TalentSimulation:GetPlanName())
+
+		if (isSimulated) then
+			self.sim_save_btn:Show()
+			self.sim_list_btn:Show()
+			self.sim_apply_btn:Show()
+			self.sim_reset_btn:Show()
+			self.plan_name_label:Show()
+			if (TalentSimulation:IsApplying()) then
+				self.sim_apply_btn:Disable()
+			else
+				self.sim_apply_btn:Enable()
+			end
+		else
+			self.sim_save_btn:Hide()
+			self.sim_list_btn:Hide()
+			self.sim_apply_btn:Hide()
+			self.sim_reset_btn:Hide()
+			self.plan_name_label:Hide()
+		end
+
+		-- Per-branch reset buttons only relevant in simulation mode
+		for _, spec in ipairs(self.specs) do
+			if (spec.reset_btn) then
+				if (isSimulated) then
+					spec.reset_btn:Show()
+				else
+					spec.reset_btn:Hide()
+				end
+			end
+		end
+
+		-- Share / Import (top-left): simulation mode, overview only (avoid the back button)
+		if (isSimulated and not self.expanded_spec) then
+			self.sim_share_btn:Show()
+			self.sim_import_btn:Show()
+		else
+			self.sim_share_btn:Hide()
+			self.sim_import_btn:Hide()
+		end
+	end;
+
+	-- ============== PLAN LIST DROPDOWN ===========================
+
+	InitializePlanListDropdown = function(self, level)
+		level = level or 1
+		if (not TalentSimulation) then return end
+		local tree = self
+
+		if (level == 1) then
+			local saved = TalentSimulation:GetSavedPlans()
+			local count = table.getn(saved)
+			if (count == 0) then
+				local info = {}
+				info.text = MSB_L("SimNoSavedPlans")
+				info.notCheckable = 1
+				info.disabled = 1
+				UIDropDownMenu_AddButton(info, level)
+				return
+			end
+			for i = 1, count do
+				local info = {}
+				info.text = saved[i].name .. "  (" .. (saved[i].points or 0) .. ")"
+				info.hasArrow = 1
+				info.notCheckable = 1
+				info.value = i
+				UIDropDownMenu_AddButton(info, level)
+			end
+
+		elseif (level == 2) then
+			local i = UIDROPDOWNMENU_MENU_VALUE
+
+			local info = {}
+			info.text = MSB_L("SimLoadPlan")
+			info.notCheckable = 1
+			info.func = function()
+				local name = TalentSimulation:GetSavedPlans()[i].name
+				TalentSimulation:LoadSavedPlan(i)
+				MSB_SimulationNotify(MSB_L("SimPlanLoaded", name))
+				CloseDropDownMenus()
+				tree:UpdateSimControls()
+				tree:Refresh()
+			end
+			UIDropDownMenu_AddButton(info, level)
+
+			info = {}
+			info.text = MSB_L("SimRenamePlan")
+			info.notCheckable = 1
+			info.func = function()
+				MSB_SimRenameSavedIndex = i
+				StaticPopup_Show("MSB_SIM_RENAME_SAVED", TalentSimulation:GetSavedPlans()[i].name)
+				CloseDropDownMenus()
+			end
+			UIDropDownMenu_AddButton(info, level)
+
+			info = {}
+			info.text = MSB_L("SimDeletePlan")
+			info.notCheckable = 1
+			info.func = function()
+				local name = TalentSimulation:GetSavedPlans()[i].name
+				TalentSimulation:DeleteSavedPlan(i)
+				MSB_SimulationNotify(MSB_L("SimPlanDeleted", name))
+				CloseDropDownMenus()
+				tree:UpdateSimControls()
+				tree:Refresh()
+			end
+			UIDropDownMenu_AddButton(info, level)
 		end
 	end;
 }
